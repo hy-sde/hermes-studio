@@ -59,9 +59,10 @@ const chatContentWrapperRef = ref<HTMLElement | null>(null);
 const showVersionManagement = ref(false);
 const showChangelog = ref(false);
 const showToolPanel = ref(false);
-const activeToolPanel = ref<"files" | "terminal">("terminal");
+const activeToolPanel = ref<"files" | "terminal">("files");
 const toolPanelWidth = ref(560);
 const toolResizeStart = ref<{ x: number; width: number } | null>(null);
+const TOOL_PANEL_RESIZE_STEP = 4;
 
 const currentMode = ref<"chat" | "live">("chat");
 
@@ -116,8 +117,14 @@ function handleToolResizeMove(event: PointerEvent) {
   if (!start) return;
   const delta = start.x - event.clientX;
   const maxWidth = toolPanelMaxWidth();
-  toolPanelWidth.value = Math.min(
+  const nextWidth = Math.min(
     Math.max(360, start.width + delta),
+    maxWidth,
+  );
+  const steppedWidth = Math.round(nextWidth / TOOL_PANEL_RESIZE_STEP) * TOOL_PANEL_RESIZE_STEP;
+  if (steppedWidth === toolPanelWidth.value) return;
+  toolPanelWidth.value = Math.min(
+    Math.max(360, steppedWidth),
     maxWidth,
   );
 }
