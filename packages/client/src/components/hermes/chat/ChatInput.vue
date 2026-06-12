@@ -1129,16 +1129,15 @@ function isImage(type: string): boolean {
   }
 
   .context-info {
-    flex: 1 1 auto;
     overflow: hidden;
     text-overflow: ellipsis;
     font-size: 10px;
     line-height: 14px;
+    margin-right: -3px;
   }
 
   .context-bar {
     width: 42px;
-    margin-left: -3px;
     flex-shrink: 0;
   }
 }
