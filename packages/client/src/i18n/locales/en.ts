@@ -2074,6 +2074,16 @@ export default {
 
   // Changelog
   changelog: {
+    new_0_6_16_1: 'Provider settings now preserve custom API modes, cover LongCat correctly, support deleting v12 provider entries, and keep model catalogs in sync with auth and API-key image providers',
+    new_0_6_16_2: 'Chat commands gained reload-skills, web title updates, unknown slash passthrough, and a clean session-context API that omits tool calls and tool results',
+    new_0_6_16_3: 'Session navigation is steadier with global-agent search results, newest-activity ordering for fresh sessions, restored mobile sidebar controls, and a stable settings footer',
+    new_0_6_16_4: 'Files are easier to use with full workspace-name hover text and drag-and-drop uploads across one-on-one and group chat panels',
+    new_0_6_16_5: 'Platform settings now include localized Feishu webhook validation fields and cleaner localization coverage',
+    new_0_6_16_6: 'Skill discovery now follows symlinked skill directories, so shared local skills appear consistently',
+    new_0_6_16_7: 'Large static assets avoid dynamic Brotli compression, improving packaged Web UI delivery under load',
+    new_0_6_16_8: 'Outbound relay and MCU login flows are available for connector-style integrations',
+    new_0_6_16_9: 'The Web UI CLI adds a --no-open flag for scripts and headless launches',
+    new_0_6_16_10: 'Desktop Linux viewport sizing and live compression status rows were polished for cleaner layout',
     new_0_6_15_1: 'Chat sidebars were redesigned and history loading controls were tuned for clearer navigation through long conversations',
     new_0_6_15_2: 'The skill command picker makes it faster to discover and insert available skill commands from chat input',
     new_0_6_15_3: 'Claude and Gemini OAuth providers are available, Gemini model IDs are normalized correctly, and model selectors can refresh config.yaml changes on demand',

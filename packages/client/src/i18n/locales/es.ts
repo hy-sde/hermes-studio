@@ -1813,6 +1813,16 @@ jobTriggered: 'Job ejecutado',
 
   // Registro de cambios
   changelog: {
+    new_0_6_16_1: 'Los ajustes de Provider ahora conservan modos API personalizados, cubren LongCat correctamente, permiten eliminar Providers v12 y sincronizan catalogos de modelos con Providers de autenticacion e imagen con API key',
+    new_0_6_16_2: 'Los comandos de chat anaden reload-skills, actualizaciones de titulo web, passthrough de comandos slash desconocidos y una API limpia de contexto de sesion sin tool calls ni tool results',
+    new_0_6_16_3: 'La navegacion de sesiones es mas estable con resultados de Global Agent en la busqueda, orden por actividad reciente para sesiones nuevas, controles moviles de barra lateral restaurados y footer de ajustes estable',
+    new_0_6_16_4: 'Los archivos son mas faciles de usar: el nombre completo del workspace aparece al pasar el cursor y los uploads por drag-and-drop funcionan en chats individuales y grupales',
+    new_0_6_16_5: 'Los ajustes de plataforma incluyen campos localizados de validacion de Feishu Webhook y mejor cobertura de localizacion',
+    new_0_6_16_6: 'El descubrimiento de skills sigue directorios symlink, para que las skills locales compartidas aparezcan de forma consistente',
+    new_0_6_16_7: 'Los assets estaticos grandes evitan Brotli dinamico, mejorando la entrega del Web UI empaquetado bajo carga',
+    new_0_6_16_8: 'Los flujos de outbound relay y login MCU estan disponibles para integraciones tipo connector',
+    new_0_6_16_9: 'La CLI de Web UI anade --no-open para scripts y lanzamientos headless',
+    new_0_6_16_10: 'El tamano del viewport en Linux desktop y las filas de estado de compresion en vivo se pulieron para un layout mas estable',
     new_0_6_15_1: 'Las barras laterales del chat se redisenaron y los controles de carga del historial facilitan navegar conversaciones largas',
     new_0_6_15_2: 'El selector de comandos de skills permite descubrir e insertar comandos disponibles mas rapido desde la entrada del chat',
     new_0_6_15_3: 'Los proveedores OAuth de Claude y Gemini estan disponibles, los ID de modelo de Gemini se normalizan correctamente y los selectores de modelo pueden refrescar cambios de config.yaml',

@@ -1813,6 +1813,16 @@ jobTriggered: 'Job ausgelost',
 
   // Anderungsprotokoll
   changelog: {
+    new_0_6_16_1: 'Provider-Einstellungen speichern jetzt eigene API-Modes, decken LongCat korrekt ab, unterstuetzen das Loeschen von v12-Providern und halten Modellkataloge mit Auth- und API-Key-Bildprovidern synchron',
+    new_0_6_16_2: 'Chat-Befehle erhalten reload-skills, Web-Titelupdates, Durchreichen unbekannter Slash-Befehle und eine saubere Session-Context-API ohne Tool Calls und Tool Results',
+    new_0_6_16_3: 'Sitzungsnavigation ist stabiler mit Global-Agent-Ergebnissen in der Suche, Sortierung neuer Sitzungen nach letzter Aktivitaet, wiederhergestellten mobilen Seitenleisten-Controls und stabilem Settings-Footer',
+    new_0_6_16_4: 'Dateien lassen sich leichter nutzen: vollstaendige Workspace-Namen erscheinen beim Hover, und Drag-and-drop-Uploads funktionieren im Einzel- und Gruppenchatbereich',
+    new_0_6_16_5: 'Plattform-Einstellungen enthalten jetzt lokalisierte Feishu-Webhook-Prueffelder und vollstaendigere Lokalisierung',
+    new_0_6_16_6: 'Skill-Discovery folgt jetzt symlinked Skill-Verzeichnissen, sodass gemeinsam genutzte lokale Skills konsistent erscheinen',
+    new_0_6_16_7: 'Grosse statische Assets umgehen dynamische Brotli-Kompression und verbessern die Auslieferung der paketierten Web UI unter Last',
+    new_0_6_16_8: 'Outbound Relay und MCU-Login-Flows sind fuer Connector-Integrationen verfuegbar',
+    new_0_6_16_9: 'Die Web UI CLI erhaelt ein --no-open Flag fuer Skripte und Headless-Starts',
+    new_0_6_16_10: 'Linux-Desktop-Viewport-Groesse und Live-Kompressionsstatuszeilen wurden fuer ein stabileres Layout verfeinert',
     new_0_6_15_1: 'Chat-Seitenleisten wurden neu gestaltet, und die Historien-Ladecontrols machen lange Unterhaltungen leichter navigierbar',
     new_0_6_15_2: 'Der Skill-Command-Picker hilft, verfuegbare Skill-Befehle schneller zu finden und aus dem Chat-Eingabefeld einzufuegen',
     new_0_6_15_3: 'Claude- und Gemini-OAuth-Provider sind verfuegbar, Gemini-Modell-IDs werden korrekt normalisiert, und Modellauswahlen koennen config.yaml-Aenderungen manuell neu laden',

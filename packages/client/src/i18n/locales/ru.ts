@@ -1825,6 +1825,16 @@ export default {
   },
 
   changelog: {
+    new_0_6_16_1: 'Настройки Provider теперь сохраняют пользовательские API mode, корректно покрывают LongCat, поддерживают удаление Provider v12 и синхронизируют каталоги моделей с auth и API-key image Provider',
+    new_0_6_16_2: 'Команды чата получили reload-skills, обновление web title, passthrough неизвестных slash-команд и чистый session context API без tool calls и tool results',
+    new_0_6_16_3: 'Навигация по сессиям стабильнее: поиск включает Global Agent sessions, новые сессии сортируются по последней активности, мобильные controls сайдбара восстановлены, footer настроек стабилен',
+    new_0_6_16_4: 'Файлы удобнее: полное имя workspace видно при hover, а drag-and-drop upload работает по всей зоне одиночного и группового чата',
+    new_0_6_16_5: 'Настройки платформы получили локализованные поля проверки Feishu Webhook и более полное покрытие i18n',
+    new_0_6_16_6: 'Skill discovery теперь следует symlink-директориям, поэтому общие локальные skills отображаются стабильно',
+    new_0_6_16_7: 'Большие static assets обходят dynamic Brotli compression, улучшая доставку packaged Web UI под нагрузкой',
+    new_0_6_16_8: 'Добавлены outbound relay и MCU login flow для connector-style интеграций',
+    new_0_6_16_9: 'Web UI CLI получила флаг --no-open для scripts и headless launches',
+    new_0_6_16_10: 'Размер viewport в Linux desktop и строки live compression status доработаны для более стабильного layout',
     new_0_6_15_1: 'Боковые панели чата переработаны, а управление загрузкой истории стало удобнее для навигации по длинным диалогам',
     new_0_6_15_2: 'Пикер skill-команд помогает быстрее находить и вставлять доступные команды из поля ввода чата',
     new_0_6_15_3: 'Добавлены OAuth providers Claude и Gemini, ID моделей Gemini корректно нормализуются, а селекторы моделей могут вручную обновлять изменения config.yaml',

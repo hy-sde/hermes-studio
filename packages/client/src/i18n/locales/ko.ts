@@ -1812,6 +1812,16 @@ export default {
 
   // 변경 이력
   changelog: {
+    new_0_6_16_1: 'Provider 설정이 사용자 API mode를 보존하고 LongCat preset을 올바르게 처리하며 v12 Provider 삭제와 auth/API-key 이미지 Provider가 포함된 모델 카탈로그 동기화를 지원합니다',
+    new_0_6_16_2: '채팅 명령에 reload-skills, 웹 제목 업데이트, 알 수 없는 slash 명령 전달, tool call과 tool result를 제외한 깨끗한 session context API를 추가했습니다',
+    new_0_6_16_3: '세션 탐색은 Global Agent 세션 검색, 새 세션의 최신 활동순 정렬, 복원된 모바일 사이드바 컨트롤, 안정적인 설정 footer로 더 안정적입니다',
+    new_0_6_16_4: 'workspace 전체 이름을 hover로 볼 수 있고 1:1 및 그룹 채팅 영역 전체에서 파일 drag-and-drop 업로드를 사용할 수 있습니다',
+    new_0_6_16_5: '플랫폼 설정에 Feishu Webhook 검증 필드 현지화와 더 넓은 i18n 커버리지를 추가했습니다',
+    new_0_6_16_6: 'symlink된 skill 디렉터리 탐색을 지원해 공유 로컬 skills가 안정적으로 표시됩니다',
+    new_0_6_16_7: '큰 정적 assets는 동적 Brotli 압축을 피해서 부하 상황에서 packaged Web UI 전달이 더 안정적입니다',
+    new_0_6_16_8: 'connector 형태의 연동을 위해 outbound relay와 MCU login flow를 추가했습니다',
+    new_0_6_16_9: 'Web UI CLI에 scripts와 headless 실행용 --no-open flag를 추가했습니다',
+    new_0_6_16_10: 'Linux desktop viewport 크기와 실시간 압축 상태 행 레이아웃을 다듬었습니다',
     new_0_6_15_1: '채팅 사이드바를 다시 디자인하고 기록 로딩 컨트롤을 조정해 긴 대화를 더 쉽게 탐색할 수 있습니다',
     new_0_6_15_2: '스킬 명령 선택기로 채팅 입력에서 사용 가능한 skill 명령을 더 빠르게 찾고 삽입할 수 있습니다',
     new_0_6_15_3: 'Claude와 Gemini OAuth Provider를 추가하고, Gemini 모델 ID 정규화를 수정했으며, 모델 선택기에서 config.yaml 변경을 수동으로 새로고침할 수 있습니다',

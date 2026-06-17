@@ -1813,6 +1813,16 @@ jobTriggered: 'Job acionado',
 
   // Registro de alteracoes
   changelog: {
+    new_0_6_16_1: 'As configuracoes de Provider agora preservam API modes personalizados, cobrem LongCat corretamente, permitem excluir Providers v12 e sincronizam catalogos de modelos com Providers de auth e imagem por API key',
+    new_0_6_16_2: 'Os comandos de chat adicionam reload-skills, atualizacoes de titulo web, passthrough de comandos slash desconhecidos e uma API limpa de contexto de sessao sem tool calls nem tool results',
+    new_0_6_16_3: 'A navegacao de sessoes ficou mais estavel com resultados de Global Agent na busca, ordenacao por atividade recente para sessoes novas, controles moveis da sidebar restaurados e footer de configuracoes estavel',
+    new_0_6_16_4: 'Arquivos ficaram mais faceis de usar: nome completo do workspace no hover e uploads por drag-and-drop em chats individuais e de grupo',
+    new_0_6_16_5: 'As configuracoes de plataforma incluem campos localizados de validacao do Feishu Webhook e melhor cobertura de localizacao',
+    new_0_6_16_6: 'A descoberta de skills agora segue diretorios symlink, entao skills locais compartilhadas aparecem de forma consistente',
+    new_0_6_16_7: 'Assets estaticos grandes evitam Brotli dinamico, melhorando a entrega do Web UI empacotado sob carga',
+    new_0_6_16_8: 'Fluxos de outbound relay e login MCU estao disponiveis para integracoes do tipo connector',
+    new_0_6_16_9: 'A CLI do Web UI adiciona --no-open para scripts e execucoes headless',
+    new_0_6_16_10: 'O tamanho do viewport no Linux desktop e as linhas de status de compressao ao vivo foram polidos para um layout mais estavel',
     new_0_6_15_1: 'As barras laterais do chat foram redesenhadas e os controles de carregamento do historico facilitam navegar conversas longas',
     new_0_6_15_2: 'O seletor de comandos de skills ajuda a descobrir e inserir comandos disponiveis mais rapido pela entrada do chat',
     new_0_6_15_3: 'Providers OAuth de Claude e Gemini estao disponiveis, IDs de modelo Gemini sao normalizados corretamente e seletores de modelo podem atualizar mudancas do config.yaml sob demanda',

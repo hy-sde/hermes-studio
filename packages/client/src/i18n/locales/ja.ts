@@ -1812,6 +1812,16 @@ export default {
 
   // 更新履歴
   changelog: {
+    new_0_6_16_1: 'Provider 設定でカスタム API mode を保持し、LongCat プリセットを正しく扱い、v12 Provider の削除と auth/API-key 画像 Provider を含むモデルカタログ同期に対応しました',
+    new_0_6_16_2: 'チャットコマンドに reload-skills、Web タイトル更新、未知のスラッシュコマンド透過、tool call と tool result を除いたクリーンな session context API を追加しました',
+    new_0_6_16_3: 'セッションナビゲーションは Global Agent セッションの検索、新規セッションの最新アクティビティ順、復元したモバイルサイドバー操作、安定した設定フッターでより安定しました',
+    new_0_6_16_4: 'workspace 名の全文をホバーで確認でき、1対1 とグループチャット全体でファイルのドラッグ&ドロップアップロードが使えます',
+    new_0_6_16_5: 'プラットフォーム設定に Feishu Webhook 検証フィールドのローカライズを追加し、ローカライズ範囲を整えました',
+    new_0_6_16_6: 'symlink された skill ディレクトリを検出できるようになり、共有ローカル skills が安定して表示されます',
+    new_0_6_16_7: '大きな静的 assets は動的 Brotli 圧縮を避け、負荷下で packaged Web UI の配信が安定します',
+    new_0_6_16_8: 'connector 系連携向けに outbound relay と MCU login flow を追加しました',
+    new_0_6_16_9: 'Web UI CLI に scripts や headless 起動向けの --no-open フラグを追加しました',
+    new_0_6_16_10: 'Linux desktop の viewport サイズとライブ圧縮ステータス行のレイアウトを調整しました',
     new_0_6_15_1: 'チャットサイドバーを再設計し、履歴読み込み操作を調整して、長い会話をより追いやすくしました',
     new_0_6_15_2: 'スキルコマンドピッカーにより、チャット入力から利用可能な skill コマンドをより素早く探して挿入できます',
     new_0_6_15_3: 'Claude と Gemini の OAuth Provider を追加し、Gemini モデル ID の正規化を修正し、モデル選択から config.yaml の変更を手動更新できるようにしました',

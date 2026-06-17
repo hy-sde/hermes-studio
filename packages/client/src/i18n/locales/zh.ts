@@ -2076,6 +2076,16 @@ export default {
 
   // 更新日志
   changelog: {
+    new_0_6_16_1: 'Provider 设置会正确保存自定义 API mode，补齐 LongCat 预设，支持删除 v12 Provider，并让模型目录同步认证和 API-key 图像 Provider',
+    new_0_6_16_2: '聊天命令新增 reload-skills、网页标题更新、未知斜杠命令透传，以及去掉 tool call 和 tool result 的干净 session context 接口',
+    new_0_6_16_3: '会话导航更稳定：搜索包含 Global Agent 会话，新会话按最新活动时间排序，移动端侧栏控制恢复，底部设置入口也保持稳定',
+    new_0_6_16_4: '文件体验更顺手：workspace 全名可悬停查看，单聊和群聊都支持把文件拖到整个聊天区域上传',
+    new_0_6_16_5: '平台设置补齐飞书 Webhook 校验字段，并完善对应国际化覆盖',
+    new_0_6_16_6: '技能发现支持 symlink 目录，共享的本地 skills 现在能稳定显示',
+    new_0_6_16_7: '大型静态资源不再走动态 Brotli 压缩，打包 Web UI 在高负载下交付更稳',
+    new_0_6_16_8: '新增 outbound relay 和 MCU 登录流程，方便连接器类集成接入',
+    new_0_6_16_9: 'Web UI CLI 新增 --no-open 参数，更适合脚本和无头启动场景',
+    new_0_6_16_10: 'Linux 桌面视口尺寸和实时压缩状态行完成布局打磨，界面更稳定',
     new_0_6_15_1: '聊天侧栏完成重设计，并优化历史加载控制，长对话里的导航更清晰',
     new_0_6_15_2: '新增技能命令选择器，可以更快发现并从输入框插入可用的 skill 命令',
     new_0_6_15_3: '新增 Claude 和 Gemini OAuth Provider，修正 Gemini 模型 ID 规范化，并支持在模型选择器里手动刷新 config.yaml 变更',

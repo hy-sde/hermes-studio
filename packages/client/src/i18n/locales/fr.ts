@@ -1813,6 +1813,16 @@ jobTriggered: 'Job declenche',
 
   // Journal des modifications
   changelog: {
+    new_0_6_16_1: 'Les reglages Provider conservent maintenant les API modes personnalises, couvrent LongCat correctement, permettent de supprimer les Providers v12 et synchronisent les catalogues de modeles avec les Providers auth et image a API key',
+    new_0_6_16_2: 'Les commandes de chat ajoutent reload-skills, les mises a jour de titre web, le passthrough des commandes slash inconnues et une API de contexte de session propre sans tool calls ni tool results',
+    new_0_6_16_3: 'La navigation des sessions est plus stable avec les resultats Global Agent dans la recherche, le tri des nouvelles sessions par activite recente, les controles mobiles de barre laterale restaures et un footer de reglages stable',
+    new_0_6_16_4: 'Les fichiers sont plus simples a utiliser: nom complet du workspace au survol et upload par drag-and-drop dans les chats individuels et de groupe',
+    new_0_6_16_5: 'Les reglages de plateforme incluent des champs de validation Feishu Webhook localises et une meilleure couverture de localisation',
+    new_0_6_16_6: 'La decouverte des skills suit maintenant les repertoires symlink, afin que les skills locaux partages apparaissent de facon coherente',
+    new_0_6_16_7: 'Les grands assets statiques evitent la compression Brotli dynamique, ameliorant la livraison du Web UI package sous charge',
+    new_0_6_16_8: 'Les flux outbound relay et login MCU sont disponibles pour les integrations de type connector',
+    new_0_6_16_9: 'La CLI Web UI ajoute --no-open pour les scripts et les lancements headless',
+    new_0_6_16_10: 'La taille du viewport Linux desktop et les lignes de statut de compression en direct ont ete ajustees pour un layout plus stable',
     new_0_6_15_1: 'Les barres laterales du chat ont ete repensees, et les controles de chargement de l historique rendent les longues conversations plus faciles a parcourir',
     new_0_6_15_2: 'Le selecteur de commandes skill permet de trouver et inserer plus vite les commandes disponibles depuis la saisie du chat',
     new_0_6_15_3: 'Les fournisseurs OAuth Claude et Gemini sont disponibles, les IDs de modele Gemini sont normalises correctement et les selecteurs de modele peuvent rafraichir config.yaml a la demande',
