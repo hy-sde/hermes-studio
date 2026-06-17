@@ -221,6 +221,10 @@ function normalizeCliPromptArgument(prompt: string): string {
     .join(' / ')
 }
 
+function hasArg(args: string[], name: string): boolean {
+  return args.includes(name)
+}
+
 function decodeChildChunk(chunk: Buffer): string {
   const utf8 = chunk.toString('utf8')
   if (process.platform !== 'win32' || !utf8.includes('\uFFFD')) return utf8
@@ -741,7 +745,9 @@ export class CodingAgentRunManager {
           ? ['--resume', run.launch.agentNativeSessionId]
           : ['--session-id', run.launch.agentNativeSessionId])
       : []
-    const promptArgument = normalizeCliPromptArgument(systemPrompt)
+    const promptArgument = hasArg(run.launch.args, '--append-system-prompt-file')
+      ? ''
+      : normalizeCliPromptArgument(systemPrompt)
     const args = [
       ...run.launch.args,
       ...nativeSessionArgs,
@@ -1178,7 +1184,7 @@ export class CodingAgentRunManager {
       },
     })
 
-    const promptArgument = normalizeCliPromptArgument(systemPrompt)
+    const promptArgument = run.launch.mode === 'scoped' ? '' : normalizeCliPromptArgument(systemPrompt)
     const commonArgs = [
       '--json',
       ...CODEX_REASONING_SUMMARY_ARGS,
