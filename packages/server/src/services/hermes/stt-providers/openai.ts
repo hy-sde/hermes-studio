@@ -88,7 +88,7 @@ export async function transcribeOpenAiCompatible(input: SttTranscribeInput): Pro
   let audioBuffer = input.audio
   let audioMimeType = input.mimeType
   let audioFileName = input.fileName
-  if (audioMimeType !== 'audio/wav' && audioMimeType !== 'audio/x-wav') {
+  if (input.settings.audioTranscode === 'ffmpeg' && audioMimeType !== 'audio/wav' && audioMimeType !== 'audio/x-wav') {
     try {
       const converted = await transcodeToWav(audioBuffer, audioMimeType)
       if (converted.mimeType === 'audio/wav') {

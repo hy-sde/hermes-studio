@@ -1,5 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+const audioConvertMock = vi.hoisted(() => ({
+  transcodeToWav: vi.fn(async (audio: Buffer) => ({
+    audio: Buffer.from(`wav:${audio.toString('utf-8')}`),
+    mimeType: 'audio/wav',
+    fileName: 'audio.wav',
+  })),
+}))
+
+vi.mock('../../packages/server/src/services/hermes/stt-providers/audio-convert', () => audioConvertMock)
+
 import { transcribeWithProvider } from '../../packages/server/src/services/hermes/stt-providers'
 import { transcribeOpenAiCompatible } from '../../packages/server/src/services/hermes/stt-providers/openai'
 
@@ -66,6 +76,7 @@ function getFormData(): FormData {
 describe('transcribeOpenAiCompatible', () => {
   beforeEach(() => {
     mockFetch.mockReset()
+    audioConvertMock.transcodeToWav.mockClear()
   })
 
   it('posts multipart audio using server-side API key', async () => {
@@ -107,6 +118,31 @@ describe('transcribeOpenAiCompatible', () => {
     expect(file.name).toBe('speech.webm')
     expect(file.type).toBe('audio/webm')
     expect(Buffer.from(await file.arrayBuffer())).toEqual(Buffer.from('audio'))
+    expect(audioConvertMock.transcodeToWav).not.toHaveBeenCalled()
+  })
+
+  it('transcodes audio to wav only when ffmpeg is selected', async () => {
+    mockFetch.mockResolvedValueOnce(jsonResponse({ text: 'hello from wav' }))
+
+    await transcribeOpenAiCompatible({
+      provider: 'openai',
+      audio: Buffer.from('audio'),
+      fileName: 'speech.webm',
+      mimeType: 'audio/webm',
+      settings: {
+        model: 'gpt-4o-transcribe',
+        audioTranscode: 'ffmpeg',
+      },
+      secrets: {
+        apiKey: 'server-secret',
+      },
+    })
+
+    expect(audioConvertMock.transcodeToWav).toHaveBeenCalledWith(Buffer.from('audio'), 'audio/webm')
+    const file = getFormData().get('file') as File
+    expect(file.name).toBe('audio.wav')
+    expect(file.type).toBe('audio/wav')
+    expect(Buffer.from(await file.arrayBuffer())).toEqual(Buffer.from('wav:audio'))
   })
 
   it('rejects missing API key', async () => {

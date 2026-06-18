@@ -380,4 +380,24 @@ describe('stt settings store', () => {
 
     expect(saved.settings.baseUrl).toContain(new URL(baseUrl).origin)
   })
+
+  it('stores only supported audio transcode modes', async () => {
+    const { store } = await initStore()
+
+    const saved = store.saveSttProviderSetting(7, 'custom', {
+      settings: {
+        baseUrl: 'http://127.0.0.1:8000/v1',
+        model: 'whisper-1',
+        audioTranscode: 'ffmpeg',
+      },
+    })
+    expect(saved.settings.audioTranscode).toBe('ffmpeg')
+
+    const ignored = store.saveSttProviderSetting(7, 'custom', {
+      settings: {
+        audioTranscode: 'auto',
+      },
+    })
+    expect(ignored.settings.audioTranscode).toBe('ffmpeg')
+  })
 })
