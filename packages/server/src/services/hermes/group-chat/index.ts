@@ -3,11 +3,12 @@ import type { Server as HttpServer } from 'http'
 import { logger } from '../../../services/logger'
 import { getDb } from '../../../db'
 import { normalizeMessageContentForStorage, normalizeMessageContentForStorageRole } from '../../../db/hermes/message-content'
-import { AgentClients, GROUP_CHAT_AGENT_SOCKET_SECRET } from './agent-clients'
+import { AgentClients, GROUP_CHAT_AGENT_SOCKET_SECRET, normalizeRoomGeneration } from './agent-clients'
 import { ContextEngine } from '../context-engine/compressor'
 import { SessionDeleter } from '../session-deleter'
 import { countTokens, SUMMARY_PREFIX } from '../../../lib/context-compressor'
 import { AgentBridgeClient } from '../agent-bridge'
+import type { ContentBlock } from '../run-chat/types'
 import { authenticateUserToken, isAuthEnabled, type AuthenticatedUser } from '../../../middleware/user-auth'
 import { findUserByUsername, getUserAvatar } from '../../../db/hermes/users-store'
 import { config } from '../../../config'
@@ -807,6 +808,38 @@ export class GroupChatServer {
         return Array.from(this.rooms.keys())
     }
 
+    private isAgentSocket(socketId: string): boolean {
+        return this.socketRequestedSourceMap?.get(socketId) === 'agent'
+    }
+
+    private shouldAcceptAgentRunGeneration(socket: Socket, roomId: string, sessionSeed: unknown, eventName: string): boolean {
+        if (!this.isAgentSocket(socket.id)) return true
+        const currentGeneration = normalizeRoomGeneration(this.storage.getRoom?.(roomId)?.sessionSeed)
+        const eventGeneration = normalizeRoomGeneration(sessionSeed)
+        if (typeof sessionSeed !== 'string' || !sessionSeed.trim()) {
+            logger.info({
+                roomId,
+                socketId: socket.id,
+                eventName,
+                reason: 'missing_session_seed',
+                currentGeneration,
+            }, '[GroupChat] generation guard drop')
+            return false
+        }
+        if (eventGeneration !== currentGeneration) {
+            logger.info({
+                roomId,
+                socketId: socket.id,
+                eventName,
+                reason: 'stale_generation',
+                eventGeneration,
+                currentGeneration,
+            }, '[GroupChat] generation guard drop')
+            return false
+        }
+        return true
+    }
+
     clearRoomRuntimeState(roomId: string): void {
         const roomTyping = this.typingState.get(roomId)
         if (roomTyping) {
@@ -901,17 +934,17 @@ export class GroupChatServer {
         logger.debug(`[GroupChat] Connected: ${userName} (socket=${socket.id}, user=${userId})`)
 
         socket.on('join', (data: { roomId?: string; name?: string }, ack?: (response?: unknown) => void) => this.handleJoin(socket, data, ack))
-        socket.on('message', (data: Partial<ChatMessage> & { roomId?: string; content: string | Array<Record<string, unknown>>; id?: string; mentionDepth?: number }, ack?: (response?: unknown) => void) => this.handleMessage(socket, data, ack))
-        socket.on('message_stream_start', (data: { roomId?: string; id?: string; senderId?: string; senderName?: string; timestamp?: number }) => this.handleMessageStreamStart(socket, data))
-        socket.on('message_stream_delta', (data: { roomId?: string; id?: string; delta?: string }) => this.handleMessageStreamDelta(socket, data))
-        socket.on('message_reasoning_delta', (data: { roomId?: string; id?: string; delta?: string }) => this.handleMessageReasoningDelta(socket, data))
-        socket.on('message_stream_end', (data: { roomId?: string; id?: string }) => this.handleMessageStreamEnd(socket, data))
-        socket.on('typing', (data: { roomId?: string }) => this.handleTyping(socket, data))
-        socket.on('stop_typing', (data: { roomId?: string }) => this.handleStopTyping(socket, data))
-        socket.on('context_status', (data: { roomId?: string; agentName?: string; status?: string }) => this.handleContextStatus(socket, data))
+        socket.on('message', (data: Partial<ChatMessage> & { roomId?: string; content: string | Array<Record<string, unknown>>; id?: string; mentionDepth?: number; sessionSeed?: string }, ack?: (response?: unknown) => void) => this.handleMessage(socket, data, ack))
+        socket.on('message_stream_start', (data: { roomId?: string; id?: string; senderId?: string; senderName?: string; timestamp?: number; sessionSeed?: string }) => this.handleMessageStreamStart(socket, data))
+        socket.on('message_stream_delta', (data: { roomId?: string; id?: string; delta?: string; sessionSeed?: string }) => this.handleMessageStreamDelta(socket, data))
+        socket.on('message_reasoning_delta', (data: { roomId?: string; id?: string; delta?: string; sessionSeed?: string }) => this.handleMessageReasoningDelta(socket, data))
+        socket.on('message_stream_end', (data: { roomId?: string; id?: string; sessionSeed?: string }) => this.handleMessageStreamEnd(socket, data))
+        socket.on('typing', (data: { roomId?: string; sessionSeed?: string }) => this.handleTyping(socket, data))
+        socket.on('stop_typing', (data: { roomId?: string; sessionSeed?: string }) => this.handleStopTyping(socket, data))
+        socket.on('context_status', (data: { roomId?: string; agentName?: string; status?: string; sessionSeed?: string }) => this.handleContextStatus(socket, data))
         socket.on('interrupt_agent', (data: { roomId?: string; agentName?: string }, ack?: (response?: unknown) => void) => this.handleInterruptAgent(socket, data, ack))
-        socket.on('approval.requested', (data: { roomId?: string; agentName?: string; approval_id?: string; command?: string; description?: string; choices?: string[]; allow_permanent?: boolean }) => this.handleApprovalRequested(socket, data))
-        socket.on('approval.resolved', (data: { roomId?: string; agentName?: string; approval_id?: string; choice?: string }) => this.handleApprovalResolved(socket, data))
+        socket.on('approval.requested', (data: { roomId?: string; agentName?: string; approval_id?: string; command?: string; description?: string; choices?: string[]; allow_permanent?: boolean; sessionSeed?: string }) => this.handleApprovalRequested(socket, data))
+        socket.on('approval.resolved', (data: { roomId?: string; agentName?: string; approval_id?: string; choice?: string; sessionSeed?: string }) => this.handleApprovalResolved(socket, data))
         socket.on('approval.respond', (data: { roomId?: string; approval_id?: string; choice?: string }, ack?: (response?: unknown) => void) => this.handleApprovalRespond(socket, data, ack))
         socket.on('disconnect', () => this.handleDisconnect(socket))
     }
@@ -1011,7 +1044,7 @@ export class GroupChatServer {
         logger.debug(`[GroupChat] ${userName} (user=${userId}) joined room: ${roomId}`)
     }
 
-    private handleMessage(socket: Socket, data: Partial<ChatMessage> & { roomId?: string; content: string | Array<Record<string, unknown>>; id?: string; mentionDepth?: number }, ack?: (res: any) => void): void {
+    private handleMessage(socket: Socket, data: Partial<ChatMessage> & { roomId?: string; content: string | Array<Record<string, unknown>>; id?: string; mentionDepth?: number; sessionSeed?: string }, ack?: (res: any) => void): void {
         const socketId = socket.id
         const roomId = data.roomId || 'general'
         const room = this.rooms.get(roomId)
@@ -1022,6 +1055,10 @@ export class GroupChatServer {
         }
 
         const member = room.getOnlineMemberBySocketId(socketId)
+        if (!this.shouldAcceptAgentRunGeneration(socket, roomId, data.sessionSeed, 'message')) {
+            ack?.({ id: this.normalizeClientMessageId(data.id) || this.generateId(), dropped: true, staleGeneration: true })
+            return
+        }
         const userId = member?.userId || socketId
         const userName = member?.name || `User-${socketId.slice(0, 6)}`
 
@@ -1051,17 +1088,19 @@ export class GroupChatServer {
         ack?.({ id: savedMsg.id })
 
         const mentionDepth = normalizeMentionDepth(data.mentionDepth)
+        const maxMentionDepth = maxAgentMentionDepth()
         const isAgentReply = savedMsg.role === 'assistant' && member?.source === 'agent'
         const shouldRouteMentions = savedMsg.role === 'user' ||
-            (isAgentReply && mentionDepth < maxAgentMentionDepth())
+            (isAgentReply && mentionDepth < maxMentionDepth)
 
         if (shouldRouteMentions) {
             // Server-side @mention routing — parse mentions and invoke agents directly.
             // Agent replies are allowed to mention other agents, but mentionDepth
             // bounds chained agent-to-agent handoffs so one prompt cannot loop forever.
             this.agentClients.processMentions(roomId, {
+                messageId: savedMsg.id,
                 content: contentToText(savedMsg.content),
-                input: Array.isArray(data.content) ? data.content : undefined,
+                input: Array.isArray(data.content) ? data.content as unknown as ContentBlock[] : undefined,
                 senderName: savedMsg.senderName,
                 senderId: savedMsg.senderId,
                 timestamp: savedMsg.timestamp,
@@ -1070,13 +1109,26 @@ export class GroupChatServer {
             }).catch((err) => {
                 logger.error(`[GroupChat] processMentions error: ${err.message}`)
             })
+        } else if (isAgentReply) {
+            logger.info({
+                roomId,
+                senderKind: 'agent',
+                scope: 'none',
+                senderName: savedMsg.senderName,
+                targetNames: [],
+                mentionDepth,
+                maxMentionDepth,
+                messageId: savedMsg.id,
+                reason: 'max_mention_depth',
+            }, '[GroupChat] mention routing skipped')
         }
     }
 
-    private handleMessageStreamStart(socket: Socket, data: { roomId?: string; id?: string; senderId?: string; senderName?: string; timestamp?: number }): void {
+    private handleMessageStreamStart(socket: Socket, data: { roomId?: string; id?: string; senderId?: string; senderName?: string; timestamp?: number; sessionSeed?: string }): void {
         const roomId = data.roomId || 'general'
         const room = this.rooms.get(roomId)
         if (!room || !room.hasOnlineMember(socket.id)) return
+        if (!this.shouldAcceptAgentRunGeneration(socket, roomId, data.sessionSeed, 'message_stream_start')) return
         const id = this.normalizeClientMessageId(data.id)
         if (!id) return
 
@@ -1093,10 +1145,11 @@ export class GroupChatServer {
         })
     }
 
-    private handleMessageStreamDelta(socket: Socket, data: { roomId?: string; id?: string; delta?: string }): void {
+    private handleMessageStreamDelta(socket: Socket, data: { roomId?: string; id?: string; delta?: string; sessionSeed?: string }): void {
         const roomId = data.roomId || 'general'
         const room = this.rooms.get(roomId)
         if (!room || !room.hasOnlineMember(socket.id)) return
+        if (!this.shouldAcceptAgentRunGeneration(socket, roomId, data.sessionSeed, 'message_stream_delta')) return
         const id = this.normalizeClientMessageId(data.id)
         if (!id || !data.delta) return
         this.nsp.to(roomId).emit('message_stream_delta', {
@@ -1106,10 +1159,11 @@ export class GroupChatServer {
         })
     }
 
-    private handleMessageReasoningDelta(socket: Socket, data: { roomId?: string; id?: string; delta?: string }): void {
+    private handleMessageReasoningDelta(socket: Socket, data: { roomId?: string; id?: string; delta?: string; sessionSeed?: string }): void {
         const roomId = data.roomId || 'general'
         const room = this.rooms.get(roomId)
         if (!room || !room.hasOnlineMember(socket.id)) return
+        if (!this.shouldAcceptAgentRunGeneration(socket, roomId, data.sessionSeed, 'message_reasoning_delta')) return
         const id = this.normalizeClientMessageId(data.id)
         if (!id || !data.delta) return
         this.nsp.to(roomId).emit('message_reasoning_delta', {
@@ -1119,17 +1173,19 @@ export class GroupChatServer {
         })
     }
 
-    private handleMessageStreamEnd(socket: Socket, data: { roomId?: string; id?: string }): void {
+    private handleMessageStreamEnd(socket: Socket, data: { roomId?: string; id?: string; sessionSeed?: string }): void {
         const roomId = data.roomId || 'general'
         const room = this.rooms.get(roomId)
         if (!room || !room.hasOnlineMember(socket.id)) return
+        if (!this.shouldAcceptAgentRunGeneration(socket, roomId, data.sessionSeed, 'message_stream_end')) return
         const id = this.normalizeClientMessageId(data.id)
         if (!id) return
         this.nsp.to(roomId).emit('message_stream_end', { roomId, id })
     }
 
-    private handleTyping(socket: Socket, data: { roomId?: string }): void {
+    private handleTyping(socket: Socket, data: { roomId?: string; sessionSeed?: string }): void {
         const roomId = data.roomId || 'general'
+        if (!this.shouldAcceptAgentRunGeneration(socket, roomId, data.sessionSeed, 'typing')) return
         const userId = this.socketUserMap.get(socket.id) || socket.id
         const userName = this.userInfoMap.get(userId)?.name || `User-${socket.id.slice(0, 6)}`
 
@@ -1156,8 +1212,9 @@ export class GroupChatServer {
         })
     }
 
-    private handleStopTyping(socket: Socket, data: { roomId?: string }): void {
+    private handleStopTyping(socket: Socket, data: { roomId?: string; sessionSeed?: string }): void {
         const roomId = data.roomId || 'general'
+        if (!this.shouldAcceptAgentRunGeneration(socket, roomId, data.sessionSeed, 'stop_typing')) return
         const userId = this.socketUserMap.get(socket.id) || socket.id
 
         // Remove from typing state
@@ -1175,12 +1232,13 @@ export class GroupChatServer {
         })
     }
 
-    private handleContextStatus(socket: Socket, data: { roomId?: string; agentName?: string; status?: string; totalTokens?: number }): void {
+    private handleContextStatus(socket: Socket, data: { roomId?: string; agentName?: string; status?: string; totalTokens?: number; sessionSeed?: string }): void {
         const roomId = data.roomId || 'general'
         const agentName = data.agentName || ''
         const status = data.status || ''
 
         if (!agentName) return
+        if (!this.shouldAcceptAgentRunGeneration(socket, roomId, data.sessionSeed, 'context_status')) return
 
         let roomStatuses = this.contextStatusState.get(roomId)
         if (!roomStatuses) {
@@ -1230,9 +1288,10 @@ export class GroupChatServer {
         }
     }
 
-    private handleApprovalRequested(socket: Socket, data: { roomId?: string; agentName?: string; approval_id?: string; command?: string; description?: string; choices?: string[]; allow_permanent?: boolean }): void {
+    private handleApprovalRequested(socket: Socket, data: { roomId?: string; agentName?: string; approval_id?: string; command?: string; description?: string; choices?: string[]; allow_permanent?: boolean; sessionSeed?: string }): void {
         const roomId = data.roomId
         if (!roomId || !data.approval_id) return
+        if (!this.shouldAcceptAgentRunGeneration(socket, roomId, data.sessionSeed, 'approval.requested')) return
         this.nsp.to(roomId).emit('approval.requested', {
             event: 'approval.requested',
             roomId,
@@ -1245,9 +1304,10 @@ export class GroupChatServer {
         })
     }
 
-    private handleApprovalResolved(socket: Socket, data: { roomId?: string; agentName?: string; approval_id?: string; choice?: string }): void {
+    private handleApprovalResolved(socket: Socket, data: { roomId?: string; agentName?: string; approval_id?: string; choice?: string; sessionSeed?: string }): void {
         const roomId = data.roomId
         if (!roomId || !data.approval_id) return
+        if (!this.shouldAcceptAgentRunGeneration(socket, roomId, data.sessionSeed, 'approval.resolved')) return
         this.nsp.to(roomId).emit('approval.resolved', {
             event: 'approval.resolved',
             roomId,
