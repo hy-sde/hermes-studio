@@ -1,7 +1,7 @@
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   createMcpShimContent,
   createShimContent,
@@ -10,7 +10,17 @@ import {
   shimPathForPlatform,
 } from '../../packages/desktop/src/main/cli-shim'
 
+const execFileMock = vi.hoisted(() => vi.fn())
+
+vi.mock('node:child_process', () => ({
+  execFile: execFileMock,
+}))
+
 let tempDirs: string[] = []
+
+beforeEach(() => {
+  execFileMock.mockReset()
+})
 
 afterEach(() => {
   for (const dir of tempDirs) {
@@ -118,5 +128,69 @@ describe('Hermes Studio CLI shim', () => {
     expect(readFileSync(result.shimPath, 'utf-8')).toContain("NODE='/runtime/node/bin/node'")
     expect(readFileSync(result.shimPath, 'utf-8')).toContain("WEBUI_SCRIPT='/resources/webui/bin/hermes-web-ui.mjs'")
     expect(readFileSync(join(homeDir, '.zprofile'), 'utf-8')).toContain('export PATH="$HOME/bin:$PATH"')
+  })
+
+  it('updates Windows user PATH through PowerShell without corrupting Unicode entries', async () => {
+    const existingPath = 'C:\\Users\\张三\\工具;C:\\Windows\\System32'
+    let writtenPath = ''
+    execFileMock.mockImplementation((command, args, options, callback) => {
+      const script = Array.isArray(args) ? args.join(' ') : ''
+      if (command !== 'powershell.exe') {
+        callback(new Error(`unexpected command: ${command}`))
+        return
+      }
+      if (script.includes('GetEnvironmentVariable')) {
+        callback(null, { stdout: Buffer.from(existingPath, 'utf-8').toString('base64'), stderr: '' })
+        return
+      }
+      if (script.includes('SetEnvironmentVariable')) {
+        writtenPath = Buffer.from(options.env.HERMES_STUDIO_WINDOWS_USER_PATH_B64, 'base64').toString('utf-8')
+        callback(null, { stdout: '', stderr: '' })
+        return
+      }
+      callback(new Error(`unexpected PowerShell script: ${script}`))
+    })
+
+    const homeDir = tempHome()
+    const result = await installHermesStudioCliShim({
+      homeDir,
+      platform: 'win32',
+      executablePath: 'C:\\Program Files\\Hermes Studio\\Hermes Studio.exe',
+      nodePath: 'C:\\Program Files\\Hermes Studio\\node.exe',
+      webUiScriptPath: 'C:\\Program Files\\Hermes Studio\\resources\\webui\\bin\\hermes-web-ui.mjs',
+      env: { Path: existingPath },
+    })
+
+    expect(result.status).toBe('installed')
+    expect(result.pathUpdated).toBe(true)
+    expect(execFileMock).toHaveBeenCalledTimes(2)
+    expect(execFileMock).not.toHaveBeenCalledWith('reg.exe', expect.anything(), expect.anything(), expect.anything())
+    expect(writtenPath).toBe(`${join(homeDir, 'bin')};${existingPath}`)
+  })
+
+  it('does not rewrite Windows user PATH when the shim directory is already present', async () => {
+    const homeDir = tempHome()
+    const existingPath = `${join(homeDir, 'bin')};C:\\Users\\张三\\工具`
+    execFileMock.mockImplementation((command, args, _options, callback) => {
+      const script = Array.isArray(args) ? args.join(' ') : ''
+      if (command === 'powershell.exe' && script.includes('GetEnvironmentVariable')) {
+        callback(null, { stdout: Buffer.from(existingPath, 'utf-8').toString('base64'), stderr: '' })
+        return
+      }
+      callback(new Error(`unexpected command: ${command}`))
+    })
+
+    const result = await installHermesStudioCliShim({
+      homeDir,
+      platform: 'win32',
+      executablePath: 'C:\\Program Files\\Hermes Studio\\Hermes Studio.exe',
+      nodePath: 'C:\\Program Files\\Hermes Studio\\node.exe',
+      webUiScriptPath: 'C:\\Program Files\\Hermes Studio\\resources\\webui\\bin\\hermes-web-ui.mjs',
+      env: { Path: existingPath },
+    })
+
+    expect(result.status).toBe('installed')
+    expect(result.pathUpdated).toBe(false)
+    expect(execFileMock).toHaveBeenCalledTimes(1)
   })
 })

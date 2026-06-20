@@ -1,3 +1,4 @@
+import { Buffer } from 'node:buffer'
 import { execFile } from 'node:child_process'
 import {
   appendFileSync,
@@ -18,6 +19,7 @@ const SHIM_MARKER = 'HERMES_STUDIO_CLI_SHIM'
 const MCP_SHIM_MARKER = 'HERMES_STUDIO_MCP_SHIM'
 const PATH_MARKER_START = '# >>> Hermes Studio CLI shim >>>'
 const PATH_MARKER_END = '# <<< Hermes Studio CLI shim <<<'
+const WINDOWS_USER_PATH_ENV_B64 = 'HERMES_STUDIO_WINDOWS_USER_PATH_B64'
 
 type ShimInstallStatus = 'installed' | 'updated' | 'unchanged' | 'skipped'
 
@@ -338,28 +340,48 @@ function shellPathSnippet(platform: NodeJS.Platform, profilePath: string): strin
   ].join('\n')
 }
 
+function powershellArgs(command: string): string[] {
+  return ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-Command', command]
+}
+
+async function readWindowsUserPath(): Promise<string> {
+  const command = [
+    "$value = [Environment]::GetEnvironmentVariable('Path', 'User')",
+    "if ($null -ne $value -and $value.Length -gt 0) { [Console]::Out.Write([Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($value))) }",
+  ].join('; ')
+  const { stdout } = await execFileAsync('powershell.exe', powershellArgs(command), {
+    encoding: 'utf-8',
+    timeout: 3000,
+    windowsHide: true,
+  })
+  const encoded = stdout.trim()
+  return encoded.length > 0 ? Buffer.from(encoded, 'base64').toString('utf-8') : ''
+}
+
+async function writeWindowsUserPath(pathValue: string): Promise<void> {
+  const command = [
+    `$bytes = [Convert]::FromBase64String($env:${WINDOWS_USER_PATH_ENV_B64})`,
+    '$value = [System.Text.Encoding]::UTF8.GetString($bytes)',
+    "[Environment]::SetEnvironmentVariable('Path', $value, 'User')",
+  ].join('; ')
+  await execFileAsync('powershell.exe', powershellArgs(command), {
+    encoding: 'utf-8',
+    env: {
+      ...process.env,
+      [WINDOWS_USER_PATH_ENV_B64]: Buffer.from(pathValue, 'utf-8').toString('base64'),
+    },
+    timeout: 3000,
+    windowsHide: true,
+  })
+}
+
 async function ensureWindowsUserPath(binDir: string): Promise<boolean> {
-  let currentPath = ''
-  try {
-    const { stdout } = await execFileAsync('reg.exe', ['query', 'HKCU\\Environment', '/v', 'Path'], {
-      encoding: 'utf-8',
-      timeout: 1500,
-      windowsHide: true,
-    })
-    const line = stdout.split(/\r?\n/).find(row => /^\s*Path\s+REG_/.test(row))
-    if (line) currentPath = line.replace(/^\s*Path\s+REG_\w+\s+/, '').trim()
-  } catch {
-    currentPath = process.env.Path || process.env.PATH || ''
-  }
+  const currentPath = await readWindowsUserPath()
 
   if (pathContainsDir(currentPath, binDir, 'win32')) return false
 
   const separator = currentPath ? ';' : ''
-  await execFileAsync('reg.exe', ['add', 'HKCU\\Environment', '/v', 'Path', '/t', 'REG_EXPAND_SZ', '/d', `${binDir}${separator}${currentPath}`, '/f'], {
-    encoding: 'utf-8',
-    timeout: 1500,
-    windowsHide: true,
-  })
+  await writeWindowsUserPath(`${binDir}${separator}${currentPath}`)
   return true
 }
 
