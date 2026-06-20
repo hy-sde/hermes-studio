@@ -2918,7 +2918,7 @@ void handleMcuAudioEnqueue(uint8_t clientId, const String &message) {
   int channels = jsonIntValue(message, F("channels"));
   segment.channels = channels == 1 ? 1 : 2;
   segment.durationMs = static_cast<uint32_t>(jsonIntValue(message, F("durationMs")));
-  segment.completionManagedByServer = true;
+  segment.completionManagedByServer = jsonBoolValue(message, F("completionManagedByServer"));
 
   bool queued = enqueueMcuAudio(segment);
   String json;
