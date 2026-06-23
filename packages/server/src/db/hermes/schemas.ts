@@ -96,6 +96,7 @@ export const WORKFLOWS_SCHEMA: Record<string, string> = {
   workspace: 'TEXT',
   nodes_json: "TEXT NOT NULL DEFAULT '[]'",
   edges_json: "TEXT NOT NULL DEFAULT '[]'",
+  viewport_json: "TEXT NOT NULL DEFAULT '{}'",
   created_at: 'INTEGER NOT NULL',
   updated_at: 'INTEGER NOT NULL',
 }

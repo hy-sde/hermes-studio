@@ -861,6 +861,14 @@ const showWorkspaceModal = ref(false);
 const workspaceValue = ref("");
 const workspaceSessionId = ref<string | null>(null);
 
+function openActiveSessionWorkspace() {
+  const session = chatStore.activeSession;
+  if (!session?.id) return;
+  workspaceSessionId.value = session.id;
+  workspaceValue.value = session.workspace || "";
+  showWorkspaceModal.value = true;
+}
+
 async function handleWorkspaceConfirm() {
   if (!workspaceSessionId.value) return;
   const ok = await setSessionWorkspace(
@@ -1564,16 +1572,23 @@ async function handleSessionModelCustomSubmit() {
             </template>
           </NButton>
           <span class="header-session-title">{{ headerTitle }}</span>
-          <span
+          <button
             v-if="chatStore.activeSession?.workspace"
             class="workspace-badge"
+            type="button"
             :title="chatStore.activeSession.workspace"
-            >📁
-            {{
-              chatStore.activeSession.workspace.split("/").pop() ||
-              chatStore.activeSession.workspace
-            }}</span
+            @click="openActiveSessionWorkspace"
           >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M3 7a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+            </svg>
+            <span>
+              {{
+                chatStore.activeSession.workspace.split("/").pop() ||
+                chatStore.activeSession.workspace
+              }}
+            </span>
+          </button>
         </div>
         <div class="header-actions">
           <!-- chat/live mode toggle hidden -->
@@ -2422,16 +2437,35 @@ async function handleSessionModelCustomSubmit() {
 }
 
 .workspace-badge {
+  border: 0;
   font-size: 11px;
+  line-height: 16px;
   color: $text-muted;
   background: rgba(255, 255, 255, 0.05);
   padding: 2px 8px;
   border-radius: 4px;
   max-width: 160px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  cursor: default;
+  cursor: pointer;
+
+  svg {
+    flex: 0 0 auto;
+  }
+
+  span {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &:hover {
+    color: $text-secondary;
+    background: rgba(var(--accent-primary-rgb), 0.06);
+  }
 }
 
 .header-tool-toggle.active {

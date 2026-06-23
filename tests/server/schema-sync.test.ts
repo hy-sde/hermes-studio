@@ -157,6 +157,7 @@ describe('Database Schema Synchronization', () => {
       expect(workflowCols.has('workspace')).toBe(true)
       expect(workflowCols.has('nodes_json')).toBe(true)
       expect(workflowCols.has('edges_json')).toBe(true)
+      expect(workflowCols.has('viewport_json')).toBe(true)
 
       expect(tableExists(db, WORKFLOW_RUNS_TABLE)).toBe(true)
       const workflowRunCols = getTableColumns(db, WORKFLOW_RUNS_TABLE)

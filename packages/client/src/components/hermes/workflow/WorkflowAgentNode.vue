@@ -2,8 +2,7 @@
 import { computed, ref } from 'vue'
 import { Handle, Position, type NodeProps } from '@vue-flow/core'
 import { NodeResizer } from '@vue-flow/node-resizer'
-import { NButton, NInput, NModal, NSelect, NUpload, useMessage } from 'naive-ui'
-import type { UploadFileInfo } from 'naive-ui'
+import { NInput, NSelect, useMessage } from 'naive-ui'
 import { useI18n } from 'vue-i18n'
 import WorkflowModelSelector from './WorkflowModelSelector.vue'
 import type { WorkflowAgentNodeData, WorkflowAgentNodeEditableData } from './types'
@@ -16,8 +15,8 @@ import '@vue-flow/node-resizer/dist/style.css'
 const props = defineProps<NodeProps<WorkflowAgentNodeData>>()
 const { t } = useI18n()
 const message = useMessage()
-const imageUploadFileList = ref<UploadFileInfo[]>([])
-const uploadingImages = ref(false)
+const attachmentInputRef = ref<HTMLInputElement | null>(null)
+const uploadingAttachments = ref(false)
 const previewPath = ref('')
 const previewVisible = ref(false)
 
@@ -50,14 +49,18 @@ function handleModelSelect(selection: { provider: string; model: string; apiMode
   props.data.onUpdate(props.id, patch)
 }
 
-async function handleImageFileChange(data: { fileList: UploadFileInfo[] }) {
-  if (uploadingImages.value) return
-  imageUploadFileList.value = data.fileList
-  const files = data.fileList
-    .map(file => file.file)
-    .filter((file): file is File => !!file)
+function openImagePicker() {
+  if (uploadingAttachments.value) return
+  attachmentInputRef.value?.click()
+}
+
+async function handleImageInputChange(event: Event) {
+  if (uploadingAttachments.value) return
+  const input = event.target instanceof HTMLInputElement ? event.target : null
+  const files = Array.from(input?.files || [])
   if (files.length === 0) return
   await uploadImages(files)
+  if (input) input.value = ''
 }
 
 function removeImage(path: string) {
@@ -81,22 +84,15 @@ function openPreview(path: string) {
   previewVisible.value = true
 }
 
-function handlePreviewPointer(event: Event, path: string) {
-  event.preventDefault()
-  event.stopPropagation()
-  openPreview(path)
-}
-
 async function uploadImages(files: File[]) {
-  uploadingImages.value = true
+  uploadingAttachments.value = true
   try {
     const paths = await props.data.onUploadImages(props.id, files)
     updateField('images', [...props.data.images, ...paths])
-    imageUploadFileList.value = []
   } catch (err: any) {
     message.error(err?.message || t('files.uploadFailed'))
   } finally {
-    uploadingImages.value = false
+    uploadingAttachments.value = false
   }
 }
 </script>
@@ -128,6 +124,12 @@ async function uploadImages(files: File[]) {
       @touchstart.stop
       @touchend.stop
     >
+      <NInput
+        :value="data.title"
+        size="small"
+        :placeholder="t('workflow.node.title')"
+        @update:value="value => updateField('title', value)"
+      />
       <NSelect
         :value="data.agent"
         :options="data.agentOptions"
@@ -169,25 +171,22 @@ async function uploadImages(files: File[]) {
         @update:value="value => updateField('input', value)"
       />
       <div class="node-images">
-        <NUpload
-          v-model:file-list="imageUploadFileList"
-          class="image-card-upload"
+        <input
+          ref="attachmentInputRef"
+          class="image-upload-input"
+          type="file"
           multiple
-          accept="image/*"
-          list-type="image-card"
-          :default-upload="false"
-          :disabled="uploadingImages"
-          @change="handleImageFileChange"
-        />
+          @change="handleImageInputChange"
+        >
         <div v-if="imageAttachments.length > 0" class="image-preview-grid">
-            <div
+          <div
             v-for="image in imageAttachments"
             :key="image"
             class="image-preview"
             :title="image"
             role="button"
             tabindex="0"
-            @pointerup="event => handlePreviewPointer(event, image)"
+            @click.stop="openPreview(image)"
             @keydown.enter.stop.prevent="openPreview(image)"
             @keydown.space.stop.prevent="openPreview(image)"
           >
@@ -196,50 +195,82 @@ async function uploadImages(files: File[]) {
               class="image-remove"
               type="button"
               :aria-label="t('common.delete')"
-              @click.stop="removeImage(image)"
+              @pointerdown.stop
+              @pointerup.stop
+              @mousedown.stop
+              @mouseup.stop
+              @click.stop.prevent="removeImage(image)"
             >
-              ×
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
             </button>
-            <span class="image-name">{{ imageName(image) }}</span>
           </div>
         </div>
         <div v-if="fileAttachments.length > 0" class="file-paths">
-          <button
+          <a
             v-for="file in fileAttachments"
             :key="file"
             class="file-path"
-            type="button"
             :title="file"
-            @pointerup="event => handlePreviewPointer(event, file)"
+            :href="imageUrl(file)"
+            target="_blank"
+            rel="noopener noreferrer"
+            @click.stop
           >
+            <svg class="file-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+              <polyline points="14 2 14 8 20 8" />
+            </svg>
             <span class="file-name">{{ imageName(file) }}</span>
-            <span class="file-remove" @click.stop="removeImage(file)">×</span>
-          </button>
+            <button
+              class="file-remove"
+              type="button"
+              :aria-label="t('common.delete')"
+              @click.stop.prevent="removeImage(file)"
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            </button>
+          </a>
         </div>
+        <button
+          class="image-upload-trigger"
+          type="button"
+          :disabled="uploadingAttachments"
+          :aria-label="t('workflow.node.uploadImages')"
+          @click.stop.prevent="openImagePicker"
+          @pointerdown.stop
+          @pointerup.stop
+        >
+          <svg v-if="!uploadingAttachments" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M12 5v14" />
+            <path d="M5 12h14" />
+          </svg>
+          <span v-else class="image-upload-loading" aria-hidden="true" />
+        </button>
       </div>
     </div>
 
     <Handle id="output" type="source" :position="Position.Right" class="workflow-handle output-handle" />
 
-    <NModal
-      v-model:show="previewVisible"
-      preset="card"
-      :title="imageName(previewPath)"
-      :style="{ width: 'min(760px, calc(100vw - 32px))' }"
-    >
-      <img
-        v-if="isImagePath(previewPath)"
-        class="attachment-preview-image"
-        :src="imageUrl(previewPath)"
-        :alt="imageName(previewPath)"
+    <Teleport to="body">
+      <div
+        v-if="previewVisible && isImagePath(previewPath)"
+        class="image-preview-overlay"
+        @click.self="previewVisible = false"
       >
-      <div v-else class="attachment-preview-file">
-        <span>{{ previewPath }}</span>
-        <NButton tag="a" :href="imageUrl(previewPath)" target="_blank" size="small">
-          {{ t('files.open') }}
-        </NButton>
+        <img
+          class="image-preview-img"
+          :src="imageUrl(previewPath)"
+          :alt="imageName(previewPath)"
+          @click="previewVisible = false"
+        >
       </div>
-    </NModal>
+    </Teleport>
   </div>
 </template>
 
@@ -350,41 +381,69 @@ async function uploadImages(files: File[]) {
 
 .node-images {
   display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.image-card-upload {
-  :deep(.n-upload-file-list) {
-    display: grid;
-    grid-template-columns: repeat(3, 56px);
-    gap: 6px;
-  }
-
-  :deep(.n-upload-file),
-  :deep(.n-upload-trigger) {
-    width: 56px;
-    height: 56px;
-    margin: 0;
-  }
-}
-
-.image-preview-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 56px);
-  gap: 6px;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 8px;
   max-height: 180px;
   overflow-y: auto;
   padding-right: 2px;
 }
 
+.image-upload-input {
+  display: none;
+}
+
+.image-upload-trigger {
+  width: 64px;
+  height: 64px;
+  border: 1px dashed $border-color;
+  border-radius: $radius-sm;
+  background: $bg-input;
+  color: $text-muted;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: border-color $transition-fast, color $transition-fast, background-color $transition-fast;
+
+  &:hover:not(:disabled) {
+    border-color: var(--accent-info);
+    color: var(--accent-info);
+    background: rgba(var(--accent-info-rgb), 0.08);
+  }
+
+  &:disabled {
+    cursor: wait;
+    opacity: 0.7;
+  }
+}
+
+.image-upload-loading {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(var(--accent-info-rgb), 0.25);
+  border-top-color: var(--accent-info);
+  border-radius: 50%;
+  animation: image-upload-spin 0.8s linear infinite;
+}
+
+@keyframes image-upload-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.image-preview-grid {
+  display: contents;
+}
+
 .image-preview {
   position: relative;
-  min-width: 0;
-  aspect-ratio: 1;
-  border: 1px solid $border-light;
-  border-radius: 6px;
-  background: $bg-input;
+  width: 64px;
+  height: 64px;
+  border: 1px solid $border-color;
+  border-radius: $radius-sm;
+  background: $bg-secondary;
   overflow: hidden;
   cursor: zoom-in;
 }
@@ -398,20 +457,23 @@ async function uploadImages(files: File[]) {
 
 .image-remove {
   position: absolute;
-  top: 4px;
-  right: 4px;
+  top: 2px;
+  right: 2px;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   width: 18px;
   height: 18px;
   border: 0;
   border-radius: 50%;
-  background: rgba(0, 0, 0, 0.58);
-  color: #fff;
+  background: rgba(0, 0, 0, 0.5);
+  color: var(--text-on-overlay);
+  appearance: none;
   cursor: pointer;
-  line-height: 18px;
   padding: 0;
   opacity: 0;
-  transform: scale(0.92);
-  transition: opacity $transition-fast, transform $transition-fast, background-color $transition-fast;
+  transition: opacity $transition-fast;
 
   &:hover {
     background: var(--error);
@@ -421,44 +483,29 @@ async function uploadImages(files: File[]) {
 .image-preview:hover .image-remove,
 .image-remove:focus-visible {
   opacity: 1;
-  transform: scale(1);
-}
-
-.image-name {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.58);
-  color: $text-secondary;
-  color: #fff;
-  font-size: 10px;
-  line-height: 1.3;
-  padding: 3px 5px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .file-paths {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
+  display: contents;
 }
 
 .file-path {
-  max-width: 100%;
   position: relative;
-  display: inline-flex;
+  display: flex;
+  flex-direction: column;
   align-items: center;
-  border: 1px solid $border-light;
-  border-radius: 4px;
-  background: $bg-input;
+  justify-content: center;
+  gap: 2px;
+  width: 92px;
+  min-height: 64px;
+  border: 1px solid $border-color;
+  border-radius: $radius-sm;
+  background: $bg-secondary;
   color: $text-secondary;
-  font-size: 11px;
-  line-height: 1.4;
-  padding: 2px 18px 2px 6px;
+  padding: 8px 10px;
   cursor: pointer;
+  text-decoration: none;
+  overflow: hidden;
 
   &:hover {
     border-color: var(--accent-info);
@@ -466,8 +513,13 @@ async function uploadImages(files: File[]) {
   }
 }
 
+.file-icon {
+  flex: 0 0 auto;
+}
+
 .file-name {
-  min-width: 0;
+  max-width: 100%;
+  font-size: 11px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -475,19 +527,22 @@ async function uploadImages(files: File[]) {
 
 .file-remove {
   position: absolute;
-  top: -5px;
-  right: -5px;
-  display: inline-flex;
+  top: 2px;
+  right: 2px;
+  display: flex;
   align-items: center;
   justify-content: center;
-  width: 16px;
-  height: 16px;
+  width: 18px;
+  height: 18px;
+  border: 0;
   border-radius: 50%;
-  background: rgba(0, 0, 0, 0.58);
-  color: #fff;
+  background: rgba(0, 0, 0, 0.5);
+  color: var(--text-on-overlay);
+  appearance: none;
+  cursor: pointer;
+  padding: 0;
   opacity: 0;
-  transform: scale(0.92);
-  transition: opacity $transition-fast, transform $transition-fast, background-color $transition-fast;
+  transition: opacity $transition-fast;
 
   &:hover {
     background: var(--error);
@@ -497,30 +552,25 @@ async function uploadImages(files: File[]) {
 .file-path:hover .file-remove,
 .file-remove:focus-visible {
   opacity: 1;
-  transform: scale(1);
 }
 
-.attachment-preview-image {
-  display: block;
-  max-width: 100%;
-  max-height: 70vh;
-  margin: 0 auto;
-  object-fit: contain;
-}
-
-.attachment-preview-file {
+.image-preview-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: rgba(0, 0, 0, 0.85);
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  min-width: 0;
+  justify-content: center;
+  cursor: pointer;
 }
 
-.attachment-preview-file span {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.image-preview-img {
+  max-width: 90vw;
+  max-height: 90vh;
+  object-fit: contain;
+  border-radius: 4px;
+  cursor: pointer;
 }
 
 @media (hover: none), (pointer: coarse) {
