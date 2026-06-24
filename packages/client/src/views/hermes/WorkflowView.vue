@@ -28,7 +28,16 @@ import {
   type WorkflowRecord,
   type WorkflowViewport,
 } from '@/api/hermes/workflows'
+import {
+  disconnectWorkflowSocket,
+  listWorkflowsSocket,
+  onWorkflowStatusUpdated,
+  subscribeWorkflowStatuses,
+  type WorkflowRuntimeStatus,
+} from '@/api/hermes/workflow-socket'
+import { fetchSkills } from '@/api/hermes/skills'
 import { inferCodingAgentApiMode, normalizeCodingAgentApiMode } from '@/api/coding-agents'
+import { buildWorkflowSkillOptions, workflowAgentToSkillTarget } from '@/utils/hermes/workflow-skills'
 import type {
   WorkflowAgentNodeData,
   WorkflowAgentNodeEditableData,
@@ -110,6 +119,11 @@ const deletingWorkflowIds = ref<Set<string>>(new Set())
 const showWorkflowBatchDeleteConfirm = ref(false)
 const isWorkflowBatchDeleting = ref(false)
 const savingWorkflow = ref(false)
+const skillOptionsByKey = ref<Record<string, WorkflowSelectOption[]>>({})
+const skillOptionsLoadingByKey = ref<Record<string, boolean>>({})
+const skillOptionRequests = new Map<string, Promise<void>>()
+const runtimeStatusByWorkflowId = ref<Record<string, WorkflowRuntimeStatus>>({})
+let removeWorkflowStatusListener: (() => void) | null = null
 let mobileQuery: MediaQueryList | null = null
 let applyingWorkflow = false
 
@@ -136,6 +150,10 @@ const workflowProfileFilterOptions = computed(() => [
   { label: t('chat.allProfiles'), value: '__all__' },
   ...workflowProfileOptions.value,
 ])
+
+const activeWorkflowProfile = computed(() => (
+  workflows.value.find(workflow => workflow.id === activeWorkflowId.value)?.profile || defaultWorkflowProfile.value
+))
 
 const workspacePickerValue = computed({
   get: () => workspacePickerTarget.value === 'create' ? createWorkflowWorkspace.value : workflowWorkspace.value,
@@ -166,6 +184,73 @@ const contextMenuOptions = computed<DropdownOption[]>(() => {
   return [{ key: 'delete-node', label: t('workflow.actions.deleteNode') }]
 })
 
+function skillOptionsCacheKey(agent: string, profile = activeWorkflowProfile.value): string {
+  const target = workflowAgentToSkillTarget(agent)
+  return target === 'hermes' ? `${target}:${profile || 'default'}` : target
+}
+
+function skillOptionsForAgent(agent: string, profile = activeWorkflowProfile.value): WorkflowSelectOption[] {
+  return skillOptionsByKey.value[skillOptionsCacheKey(agent, profile)] || []
+}
+
+function skillsLoadingForAgent(agent: string, profile = activeWorkflowProfile.value): boolean {
+  return Boolean(skillOptionsLoadingByKey.value[skillOptionsCacheKey(agent, profile)])
+}
+
+function withRuntimeNodeData(data: WorkflowAgentNodeData): WorkflowAgentNodeData {
+  return {
+    ...data,
+    agentOptions: agentOptions.value,
+    skillOptions: skillOptionsForAgent(data.agent),
+    skillsLoading: skillsLoadingForAgent(data.agent),
+    modelGroups: modelGroups.value,
+    onUpdate: updateNodeData,
+    onUploadImages: uploadNodeImages,
+  }
+}
+
+function refreshWorkflowNodeSkillOptions() {
+  nodes.value = nodes.value.map<WorkflowNode>(node => ({
+    ...node,
+    data: withRuntimeNodeData(node.data),
+  }))
+}
+
+async function ensureSkillOptionsForAgent(agent: string, profile = activeWorkflowProfile.value): Promise<void> {
+  const target = workflowAgentToSkillTarget(agent)
+  const key = skillOptionsCacheKey(agent, profile)
+  if (skillOptionsByKey.value[key] || skillOptionRequests.has(key)) return skillOptionRequests.get(key)
+
+  skillOptionsLoadingByKey.value = { ...skillOptionsLoadingByKey.value, [key]: true }
+  refreshWorkflowNodeSkillOptions()
+
+  const request = fetchSkills(target === 'hermes' ? profile : undefined, target)
+    .then((data) => {
+      skillOptionsByKey.value = {
+        ...skillOptionsByKey.value,
+        [key]: buildWorkflowSkillOptions(data),
+      }
+    })
+    .catch((err) => {
+      console.error('Failed to load workflow skills:', err)
+      skillOptionsByKey.value = { ...skillOptionsByKey.value, [key]: [] }
+    })
+    .finally(() => {
+      const { [key]: _finished, ...rest } = skillOptionsLoadingByKey.value
+      skillOptionsLoadingByKey.value = rest
+      skillOptionRequests.delete(key)
+      refreshWorkflowNodeSkillOptions()
+    })
+
+  skillOptionRequests.set(key, request)
+  return request
+}
+
+function ensureSkillOptionsForVisibleNodes() {
+  const agents = new Set(nodes.value.map(node => node.data.agent))
+  for (const agent of agents) void ensureSkillOptionsForAgent(agent)
+}
+
 function makeNode(
   id: string,
   title: string,
@@ -189,6 +274,8 @@ function makeNode(
       images: data.images || [],
       status: data.status || 'idle',
       agentOptions: agentOptions.value,
+      skillOptions: skillOptionsForAgent(data.agent || agentOptions.value[0]?.value || 'hermes'),
+      skillsLoading: skillsLoadingForAgent(data.agent || agentOptions.value[0]?.value || 'hermes'),
       modelGroups: modelGroups.value,
       onUpdate: updateNodeData,
       onUploadImages: uploadNodeImages,
@@ -220,13 +307,10 @@ watch([agentOptions, modelGroups], () => {
     ...node,
     data: {
       ...node.data,
-      agentOptions: agentOptions.value,
-      modelGroups: modelGroups.value,
       ...normalizeNodeModel(node.data),
-      onUpdate: updateNodeData,
-      onUploadImages: uploadNodeImages,
     },
   }))
+  refreshWorkflowNodeSkillOptions()
 })
 
 watch([workflowName, workflowWorkspace, nodes, edges, nextNodeIndex], () => {
@@ -245,6 +329,9 @@ onMounted(() => {
 onUnmounted(() => {
   mobileQuery?.removeEventListener('change', handleMobileChange)
   window.removeEventListener('hermes:open-page-sidebar', openPageSidebar)
+  removeWorkflowStatusListener?.()
+  removeWorkflowStatusListener = null
+  disconnectWorkflowSocket()
 })
 
 function handleMobileChange(event: MediaQueryList | MediaQueryListEvent) {
@@ -281,13 +368,7 @@ function cloneWorkflowNodes(source: WorkflowNode[]): WorkflowNode[] {
     ...node,
     position: { ...node.position },
     style: { ...node.style },
-    data: {
-      ...node.data,
-      agentOptions: agentOptions.value,
-      modelGroups: modelGroups.value,
-      onUpdate: updateNodeData,
-      onUploadImages: uploadNodeImages,
-    },
+    data: withRuntimeNodeData(node.data),
   }))
 }
 
@@ -412,13 +493,23 @@ function workflowDocumentFromRecord(record: WorkflowRecord): WorkflowDocument {
 async function initializeWorkflowPage() {
   await profilesStore.fetchProfiles()
   createWorkflowProfile.value = defaultWorkflowProfile.value
+  removeWorkflowStatusListener = onWorkflowStatusUpdated(handleWorkflowRuntimeStatus)
   await loadWorkflows()
+  void subscribeWorkflowStatuses().then(applyWorkflowRuntimeStatuses).catch((err) => {
+    console.error('Failed to subscribe workflow statuses:', err)
+  })
 }
 
 async function loadWorkflows() {
   workflowsLoading.value = true
   try {
-    const records = await listWorkflowsApi()
+    let records: WorkflowRecord[]
+    try {
+      records = await listWorkflowsSocket()
+    } catch (socketErr) {
+      console.warn('Failed to load workflows from socket, falling back to HTTP:', socketErr)
+      records = await listWorkflowsApi()
+    }
     const docs = records.map(workflowDocumentFromRecord)
     workflows.value = docs
     if (docs.length === 0) {
@@ -431,6 +522,31 @@ async function loadWorkflows() {
   } finally {
     workflowsLoading.value = false
   }
+}
+
+function applyWorkflowRuntimeStatuses(statuses: WorkflowRuntimeStatus[]) {
+  const next = { ...runtimeStatusByWorkflowId.value }
+  for (const status of statuses) next[status.workflowId] = status
+  runtimeStatusByWorkflowId.value = next
+}
+
+function workflowNodeStatusFromRuntime(status?: WorkflowRuntimeStatus): WorkflowNodeStatus {
+  if (status?.status === 'running' || status?.status === 'queued') return 'running'
+  if (status?.status === 'completed') return 'ready'
+  return 'idle'
+}
+
+function handleWorkflowRuntimeStatus(status: WorkflowRuntimeStatus) {
+  runtimeStatusByWorkflowId.value = {
+    ...runtimeStatusByWorkflowId.value,
+    [status.workflowId]: status,
+  }
+  if (status.workflowId !== activeWorkflowId.value) return
+  const nodeStatus = workflowNodeStatusFromRuntime(status)
+  nodes.value = nodes.value.map<WorkflowNode>(node => ({
+    ...node,
+    data: withRuntimeNodeData({ ...node.data, status: nodeStatus }),
+  }))
 }
 
 function handleWorkflowProfileFilterChange(value: string) {
@@ -551,12 +667,18 @@ async function applyWorkflow(workflow: WorkflowDocument, closeMobile: boolean) {
   activeWorkflowId.value = workflow.id
   workflowName.value = workflow.name
   workflowWorkspace.value = workflow.workspace
-  nodes.value = cloneWorkflowNodes(workflow.nodes)
+  const runtimeStatus = runtimeStatusByWorkflowId.value[workflow.id]
+  const nodeStatus = workflowNodeStatusFromRuntime(runtimeStatus)
+  nodes.value = cloneWorkflowNodes(workflow.nodes).map<WorkflowNode>(node => ({
+    ...node,
+    data: withRuntimeNodeData({ ...node.data, status: nodeStatus }),
+  }))
   edges.value = cloneWorkflowEdges(workflow.edges)
   nextNodeIndex.value = workflow.nextNodeIndex
   await nextTick()
   await setViewport(workflow.viewport, { duration: 0 })
   applyingWorkflow = false
+  ensureSkillOptionsForVisibleNodes()
   if (closeMobile && isMobile.value) showWorkflowSidebar.value = false
 }
 
@@ -600,6 +722,9 @@ async function submitCreateWorkflow() {
     workflows.value = [workflow, ...workflows.value]
     createWorkflowDrawerVisible.value = false
     await applyWorkflow(workflow, true)
+    void subscribeWorkflowStatuses(workflow.id).then(applyWorkflowRuntimeStatuses).catch((err) => {
+      console.error('Failed to subscribe workflow status:', err)
+    })
   } catch (err: any) {
     message.error(err?.message || t('common.saveFailed'))
   } finally {
@@ -751,10 +876,15 @@ function updateNodeData(id: string, patch: Partial<WorkflowAgentNodeEditableData
       ? {
           ...node,
           style: patch.images ? expandNodeHeightForImages(node.style, patch.images.length) : node.style,
-          data: { ...node.data, ...patch },
+          data: withRuntimeNodeData({
+            ...node.data,
+            ...patch,
+            skills: typeof patch.agent === 'string' && patch.agent !== node.data.agent ? [] : patch.skills ?? node.data.skills,
+          }),
         }
       : node
   ))
+  if (typeof patch.agent === 'string') void ensureSkillOptionsForAgent(patch.agent)
 }
 
 function expandNodeHeightForImages(style: WorkflowNode['style'], imageCount: number): WorkflowNode['style'] {
@@ -865,6 +995,7 @@ async function addAgentNode() {
     makeNode(id, t('workflow.newNodeTitle', { count: nextNodeIndex.value }), getNextVisibleNodePosition()),
   ]
   nextNodeIndex.value += 1
+  ensureSkillOptionsForVisibleNodes()
   await nextTick()
 }
 

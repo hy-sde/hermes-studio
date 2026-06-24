@@ -20,6 +20,8 @@ export interface WorkflowAgentNodeData {
   images: string[]
   status: WorkflowNodeStatus
   agentOptions: WorkflowSelectOption[]
+  skillOptions: WorkflowSelectOption[]
+  skillsLoading: boolean
   modelGroups: AvailableModelGroup[]
   onUpdate: (id: string, patch: Partial<WorkflowAgentNodeEditableData>) => void
   onUploadImages: (id: string, files: File[]) => Promise<string[]>

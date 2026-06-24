@@ -13,6 +13,8 @@ execution is intentionally not wired yet.
 - Client API helper: `packages/client/src/api/hermes/workflows.ts`
 - Server routes: `packages/server/src/routes/hermes/workflows.ts`
 - Server controller: `packages/server/src/controllers/hermes/workflows.ts`
+- Server service singleton: `packages/server/src/services/workflow-manager.ts`
+- Server socket: `packages/server/src/services/workflow-socket.ts`
 - Store: `packages/server/src/db/hermes/workflow-store.ts`
 - Schema: `packages/server/src/db/hermes/schemas.ts`
 
@@ -175,6 +177,16 @@ Routes:
 - `PATCH /api/hermes/workflows/:id`
 - `DELETE /api/hermes/workflows/:id`
 - `POST /api/hermes/workflows/batch-delete`
+
+Socket namespace:
+
+- `/workflow`
+- `workflows.list` returns the same workflow list shape as the HTTP list API.
+- `workflow.status.subscribe` subscribes to accessible workflow status rooms, or
+  to a single workflow by `workflowId`.
+- `workflow.status.unsubscribe` leaves the matching status room.
+- `workflow.status.updated` is emitted when the server-side workflow manager
+  publishes a runtime status change.
 
 Create body:
 

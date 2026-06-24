@@ -153,6 +153,8 @@ async function uploadImages(files: File[]) {
       />
       <NSelect
         :value="data.skills"
+        :options="data.skillOptions"
+        :loading="data.skillsLoading"
         multiple
         tag
         filterable

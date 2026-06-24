@@ -1,11 +1,5 @@
 import type { Context } from 'koa'
-import {
-  createWorkflow as createWorkflowRecord,
-  deleteWorkflow,
-  getWorkflow,
-  listWorkflows,
-  updateWorkflow,
-} from '../../db/hermes/workflow-store'
+import { getWorkflowManager, type WorkflowUpdateInput } from '../../services/workflow-manager'
 import { listUserProfiles } from '../../db/hermes/users-store'
 
 const MAX_BATCH_DELETE = 200
@@ -98,7 +92,7 @@ function rejectBadRequest(ctx: Context, error?: string): boolean {
 export async function list(ctx: Context) {
   const profile = explicitListProfile(ctx)
   if (profile && denyProfileAccess(ctx, profile)) return
-  const workflows = filterByAllowedProfiles(ctx, listWorkflows(profile))
+  const workflows = filterByAllowedProfiles(ctx, getWorkflowManager().list(profile))
   ctx.body = { workflows }
 }
 
@@ -106,7 +100,7 @@ export async function get(ctx: Context) {
   const id = requiredId(ctx)
   if (!id) return
 
-  const workflow = getWorkflow(id)
+  const workflow = getWorkflowManager().get(id)
   if (!workflow) {
     ctx.status = 404
     ctx.body = { error: 'workflow not found' }
@@ -135,7 +129,7 @@ export async function create(ctx: Context) {
   if (rejectBadRequest(ctx, workspace.error || nodes.error || edges.error || viewport.error)) return
 
   try {
-    const workflow = createWorkflowRecord({
+    const workflow = getWorkflowManager().create({
       name,
       profile,
       workspace: workspace.value,
@@ -155,7 +149,7 @@ export async function update(ctx: Context) {
   const id = requiredId(ctx)
   if (!id) return
 
-  const existing = getWorkflow(id)
+  const existing = getWorkflowManager().get(id)
   if (!existing) {
     ctx.status = 404
     ctx.body = { error: 'workflow not found' }
@@ -164,7 +158,7 @@ export async function update(ctx: Context) {
   if (denyProfileAccess(ctx, existing.profile)) return
 
   const body = bodyRecord(ctx)
-  const patch: Parameters<typeof updateWorkflow>[1] = {}
+  const patch: WorkflowUpdateInput = {}
   if (body.name !== undefined) {
     if (typeof body.name !== 'string' || !body.name.trim()) {
       ctx.status = 400
@@ -183,7 +177,7 @@ export async function update(ctx: Context) {
   if (edges.value !== undefined) patch.edges = edges.value
   if (viewport.value !== undefined) patch.viewport = viewport.value
 
-  const workflow = updateWorkflow(id, patch)
+  const workflow = getWorkflowManager().update(id, patch)
   ctx.body = { workflow }
 }
 
@@ -191,7 +185,7 @@ export async function remove(ctx: Context) {
   const id = requiredId(ctx)
   if (!id) return
 
-  const workflow = getWorkflow(id)
+  const workflow = getWorkflowManager().get(id)
   if (!workflow) {
     ctx.status = 404
     ctx.body = { error: 'workflow not found' }
@@ -199,7 +193,7 @@ export async function remove(ctx: Context) {
   }
   if (denyProfileAccess(ctx, workflow.profile)) return
 
-  deleteWorkflow(id)
+  getWorkflowManager().delete(id)
   ctx.body = { ok: true }
 }
 
@@ -223,7 +217,7 @@ export async function batchRemove(ctx: Context) {
   const errors: Array<{ id: string; error: string }> = []
   let deleted = 0
   for (const id of uniqueIds) {
-    const workflow = getWorkflow(id)
+    const workflow = getWorkflowManager().get(id)
     if (!workflow) {
       errors.push({ id, error: 'workflow not found' })
       continue
@@ -232,7 +226,7 @@ export async function batchRemove(ctx: Context) {
       errors.push({ id, error: `Profile "${profileName(workflow.profile)}" is not available for this user` })
       continue
     }
-    if (deleteWorkflow(id)) deleted += 1
+    if (getWorkflowManager().delete(id)) deleted += 1
     else errors.push({ id, error: 'workflow not found' })
   }
 
