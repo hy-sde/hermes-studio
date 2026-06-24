@@ -56,8 +56,10 @@ const EXTRA_PYTHON_PACKAGES = splitPackageList(
 const BROWSER_PACKAGES = splitPackageList(
   process.env.HERMES_BROWSER_PACKAGES || 'agent-browser@^0.26.0 @askjo/camofox-browser@^1.5.2',
 )
-const WINDOWS_CHROME_FOR_TESTING_VERSION = (
-  process.env.HERMES_WINDOWS_CHROME_FOR_TESTING_VERSION || '149.0.7827.55'
+const CHROME_FOR_TESTING_VERSION = (
+  process.env.HERMES_CHROME_FOR_TESTING_VERSION
+  || process.env.HERMES_WINDOWS_CHROME_FOR_TESTING_VERSION
+  || '149.0.7827.55'
 ).trim()
 const SKIP_BROWSER_RUNTIME = process.env.HERMES_SKIP_BROWSER_RUNTIME === '1'
   || process.env.HERMES_SKIP_BROWSER_RUNTIME?.toLowerCase() === 'true'
@@ -114,10 +116,6 @@ function runInvocation(invocation, args, options = {}) {
 
 function optionalRunInvocation(invocation, args, options = {}) {
   return optionalRun(invocation.command, [...invocation.argsPrefix, ...args], options)
-}
-
-function powerShellLiteral(value) {
-  return `'${String(value).replace(/'/g, "''")}'`
 }
 
 function pythonBuildEnv() {
@@ -273,20 +271,28 @@ function findBundledBrowserExecutable() {
   return findBrowserInstallInHome(AGENT_BROWSER_HOME)?.executable ?? null
 }
 
-function shouldPinWindowsChromeForTesting() {
-  if (TARGET_OS !== 'win32') return false
-  if (!WINDOWS_CHROME_FOR_TESTING_VERSION) return false
-  return !['0', 'false', 'off', 'auto'].includes(WINDOWS_CHROME_FOR_TESTING_VERSION.toLowerCase())
+function shouldPinChromeForTesting() {
+  if (!CHROME_FOR_TESTING_VERSION) return false
+  return !['0', 'false', 'off', 'auto'].includes(CHROME_FOR_TESTING_VERSION.toLowerCase())
 }
 
-function windowsChromeForTestingUrl() {
+function chromeForTestingPlatform() {
+  if (TARGET_OS === 'win32' && TARGET_ARCH === 'x64') return 'win64'
+  if (TARGET_OS === 'darwin' && TARGET_ARCH === 'arm64') return 'mac-arm64'
+  if (TARGET_OS === 'darwin' && TARGET_ARCH === 'x64') return 'mac-x64'
+  if (TARGET_OS === 'linux' && TARGET_ARCH === 'x64') return 'linux64'
+  throw new Error(`Pinned Chrome for Testing is not configured for ${TARGET_OS}-${TARGET_ARCH}`)
+}
+
+function chromeForTestingUrl() {
+  if (process.env.HERMES_CHROME_FOR_TESTING_URL?.trim()) {
+    return process.env.HERMES_CHROME_FOR_TESTING_URL.trim()
+  }
   if (process.env.HERMES_WINDOWS_CHROME_FOR_TESTING_URL?.trim()) {
     return process.env.HERMES_WINDOWS_CHROME_FOR_TESTING_URL.trim()
   }
-  if (TARGET_ARCH !== 'x64') {
-    throw new Error(`Pinned Windows Chrome for Testing is only configured for x64, got ${TARGET_ARCH}`)
-  }
-  return `https://storage.googleapis.com/chrome-for-testing-public/${WINDOWS_CHROME_FOR_TESTING_VERSION}/win64/chrome-win64.zip`
+  const platform = chromeForTestingPlatform()
+  return `https://storage.googleapis.com/chrome-for-testing-public/${CHROME_FOR_TESTING_VERSION}/${platform}/chrome-${platform}.zip`
 }
 
 function removeChromeBundles() {
@@ -300,41 +306,58 @@ function removeChromeBundles() {
   }
 }
 
-function pinWindowsChromeForTestingBundle() {
-  if (!shouldPinWindowsChromeForTesting()) return
+function extractChromeForTestingArchive(url, zipPath, extractDir) {
+  run(pyBin, [
+    '-c',
+    [
+      'import sys',
+      'import urllib.request',
+      'import zipfile',
+      'url, zip_path, extract_dir = sys.argv[1:4]',
+      'urllib.request.urlretrieve(url, zip_path)',
+      'with zipfile.ZipFile(zip_path) as archive:',
+      '    archive.extractall(extract_dir)',
+    ].join('\n'),
+    url,
+    zipPath,
+    extractDir,
+  ])
+}
+
+function extractedChromeBundleDir(extractDir) {
+  const entries = readdirSync(extractDir, { withFileTypes: true })
+    .filter(entry => entry.isDirectory() && entry.name.startsWith('chrome-'))
+    .map(entry => join(extractDir, entry.name))
+  if (entries.length === 0) return null
+  return entries[0]
+}
+
+function pinChromeForTestingBundle() {
+  if (!shouldPinChromeForTesting()) return
 
   const targetBrowsersDir = join(AGENT_BROWSER_HOME, 'browsers')
-  const targetBundleDir = join(targetBrowsersDir, `chrome-${WINDOWS_CHROME_FOR_TESTING_VERSION}`)
+  const targetBundleDir = join(targetBrowsersDir, `chrome-${CHROME_FOR_TESTING_VERSION}`)
   const tmpRoot = mkdtempSync(join(tmpdir(), 'hermes-cft-'))
   const zipPath = join(tmpRoot, 'chrome.zip')
   const extractDir = join(tmpRoot, 'extract')
-  const url = windowsChromeForTestingUrl()
+  const url = chromeForTestingUrl()
 
   try {
-    console.log(`→ Pinning Windows Chrome for Testing ${WINDOWS_CHROME_FOR_TESTING_VERSION}`)
+    console.log(`→ Pinning Chrome for Testing ${CHROME_FOR_TESTING_VERSION} for ${TARGET_OS}-${TARGET_ARCH}`)
     mkdirSync(extractDir, { recursive: true })
-    run('powershell.exe', [
-      '-NoProfile',
-      '-ExecutionPolicy',
-      'Bypass',
-      '-Command',
-      [
-        '$ProgressPreference = "SilentlyContinue"',
-        `Invoke-WebRequest -Uri ${powerShellLiteral(url)} -OutFile ${powerShellLiteral(zipPath)}`,
-        `Expand-Archive -LiteralPath ${powerShellLiteral(zipPath)} -DestinationPath ${powerShellLiteral(extractDir)} -Force`,
-      ].join('; '),
-    ])
+    extractChromeForTestingArchive(url, zipPath, extractDir)
 
-    const executable = findBrowserExecutableUnder(extractDir, bundledBrowserExecutableNames())
+    const bundleDir = extractedChromeBundleDir(extractDir)
+    const executable = bundleDir ? findBrowserExecutableUnder(bundleDir, bundledBrowserExecutableNames()) : null
     if (!executable) {
-      console.error(`Pinned Chrome for Testing archive did not contain chrome.exe: ${url}`)
+      console.error(`Pinned Chrome for Testing archive did not contain a browser executable: ${url}`)
       process.exit(1)
     }
 
     removeChromeBundles()
     mkdirSync(targetBrowsersDir, { recursive: true })
-    cpSync(dirname(executable), targetBundleDir, { recursive: true, force: true, verbatimSymlinks: true })
-    console.log(`✓ pinned Windows Chrome for Testing at ${targetBundleDir}`)
+    cpSync(bundleDir, targetBundleDir, { recursive: true, force: true, verbatimSymlinks: true })
+    console.log(`✓ pinned Chrome for Testing at ${targetBundleDir}`)
   } finally {
     rmSync(tmpRoot, { recursive: true, force: true })
   }
@@ -432,7 +455,7 @@ function installBrowserRuntime() {
 
   console.log(`→ Installing Chromium for bundled agent-browser at ${AGENT_BROWSER_HOME}`)
   runInvocation(commandInvocation(ab), ['install'], { env: browserRuntimeEnv() })
-  pinWindowsChromeForTestingBundle()
+  pinChromeForTestingBundle()
 
   const browserExecutable = ensureBundledBrowserExecutable()
   if (!browserExecutable) {

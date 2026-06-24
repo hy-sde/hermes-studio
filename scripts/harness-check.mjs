@@ -390,9 +390,10 @@ if (!desktopRuntimeAssetName.includes('hermes-runtime-hermes-agent-')) {
 for (const phrase of [
   'websockets',
   'agent-browser@^0.26.0',
-  'HERMES_WINDOWS_CHROME_FOR_TESTING_VERSION',
+  'HERMES_CHROME_FOR_TESTING_VERSION',
   '149.0.7827.55',
-  'pinWindowsChromeForTestingBundle',
+  'pinChromeForTestingBundle',
+  'chromeForTestingPlatform',
   'AGENT_BROWSER_HOME',
   'AGENT_BROWSER_EXECUTABLE_PATH',
   'PLAYWRIGHT_BROWSERS_PATH',
@@ -418,6 +419,8 @@ for (const phrase of [
 }
 
 for (const phrase of [
+  'bundledAgentBrowserHome',
+  'AGENT_BROWSER_HOME',
   'bundledNodeBin',
   'HERMES_AGENT_NODE',
   'HERMES_AGENT_GIT',
@@ -427,6 +430,10 @@ for (const phrase of [
   if (!desktopWebuiServer.includes(phrase)) {
     fail(`desktop webui server must expose bundled browser runtime: ${phrase}`)
   }
+}
+
+if (desktopWebuiServer.includes('bundledBrowserExecutable()')) {
+  fail('desktop webui server must let agent-browser resolve the bundled browser from AGENT_BROWSER_HOME')
 }
 
 for (const phrase of [
