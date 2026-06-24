@@ -2014,6 +2014,7 @@ jobTriggered: 'Job acionado',
   },
   workflow: {
     title: 'Workflow',
+    profile: 'Perfil',
     namePlaceholder: 'Nome do workflow',
     workspace: {
       title: 'Selecionar workspace',
@@ -2073,6 +2074,7 @@ jobTriggered: 'Job acionado',
     },
     runs: {
       title: 'Run Records',
+      refresh: 'Refresh',
       empty: 'No run records',
       startNodes: '{count} start nodes',
       show: 'Show run records',

@@ -611,6 +611,7 @@ export default {
 
   workflow: {
     title: '工作流',
+    profile: '配置',
     namePlaceholder: '工作流名称',
     workspace: {
       title: '选择工作区',
@@ -670,6 +671,7 @@ export default {
     },
     runs: {
       title: '执行记录',
+      refresh: '刷新',
       empty: '暂无执行记录',
       startNodes: '{count} 个起始节点',
       show: '显示执行记录',

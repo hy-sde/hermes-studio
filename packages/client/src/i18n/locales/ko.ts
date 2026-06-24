@@ -2013,6 +2013,7 @@ export default {
   },
   workflow: {
     title: '워크플로',
+    profile: '프로필',
     namePlaceholder: '워크플로 이름',
     workspace: {
       title: '작업 공간 선택',
@@ -2072,6 +2073,7 @@ export default {
     },
     runs: {
       title: 'Run Records',
+      refresh: 'Refresh',
       empty: 'No run records',
       startNodes: '{count} start nodes',
       show: 'Show run records',

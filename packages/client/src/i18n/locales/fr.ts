@@ -2014,6 +2014,7 @@ jobTriggered: 'Job declenche',
   },
   workflow: {
     title: 'Workflow',
+    profile: 'Profil',
     namePlaceholder: 'Nom du workflow',
     workspace: {
       title: 'Sélectionner le workspace',
@@ -2073,6 +2074,7 @@ jobTriggered: 'Job declenche',
     },
     runs: {
       title: 'Run Records',
+      refresh: 'Refresh',
       empty: 'No run records',
       startNodes: '{count} start nodes',
       show: 'Show run records',

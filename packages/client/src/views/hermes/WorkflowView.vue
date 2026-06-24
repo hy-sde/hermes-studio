@@ -1834,7 +1834,7 @@ function nodeColor(node: { data: WorkflowAgentNodeData }) {
       <aside v-if="showWorkflowRunsPanel" class="workflow-runs-panel">
         <div class="workflow-runs-header">
           <div class="workflow-runs-title">{{ t('workflow.runs.title') }}</div>
-          <button class="workflow-runs-refresh" type="button" :title="t('common.refresh')" @click="loadWorkflowRuns()">
+          <button class="workflow-runs-refresh" type="button" :title="t('workflow.runs.refresh')" @click="loadWorkflowRuns()">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
               <path d="M21 12a9 9 0 0 1-15.5 6.2" />
               <path d="M3 12a9 9 0 0 1 15.5-6.2" />
@@ -1918,7 +1918,7 @@ function nodeColor(node: { data: WorkflowAgentNodeData }) {
             />
           </label>
           <label class="workflow-field">
-            <span class="workflow-field-label">{{ t('settings.profile') }}</span>
+            <span class="workflow-field-label">{{ t('workflow.profile') }}</span>
             <NSelect
               v-model:value="createWorkflowProfile"
               :options="workflowProfileOptions"

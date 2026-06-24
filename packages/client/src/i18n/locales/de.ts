@@ -2014,6 +2014,7 @@ jobTriggered: 'Job ausgelost',
   },
   workflow: {
     title: 'Workflow',
+    profile: 'Profil',
     namePlaceholder: 'Workflow-Name',
     workspace: {
       title: 'Workspace auswählen',
@@ -2073,6 +2074,7 @@ jobTriggered: 'Job ausgelost',
     },
     runs: {
       title: 'Run Records',
+      refresh: 'Refresh',
       empty: 'No run records',
       startNodes: '{count} start nodes',
       show: 'Show run records',

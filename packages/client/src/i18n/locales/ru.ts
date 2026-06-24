@@ -516,6 +516,7 @@ export default {
 
   workflow: {
     title: 'Рабочий процесс',
+    profile: 'Профиль',
     namePlaceholder: 'Название рабочего процесса',
     workspace: {
       title: 'Выбрать рабочую область',
@@ -575,6 +576,7 @@ export default {
     },
     runs: {
       title: 'Run Records',
+      refresh: 'Refresh',
       empty: 'No run records',
       startNodes: '{count} start nodes',
       show: 'Show run records',

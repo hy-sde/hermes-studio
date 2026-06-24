@@ -611,6 +611,7 @@ export default {
 
   workflow: {
     title: 'Workflow',
+    profile: 'Profile',
     namePlaceholder: 'Workflow name',
     workspace: {
       title: 'Select Workspace',
@@ -670,6 +671,7 @@ export default {
     },
     runs: {
       title: 'Run Records',
+      refresh: 'Refresh',
       empty: 'No run records',
       startNodes: '{count} start nodes',
       show: 'Show run records',

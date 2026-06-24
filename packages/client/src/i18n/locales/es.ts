@@ -2014,6 +2014,7 @@ jobTriggered: 'Job ejecutado',
   },
   workflow: {
     title: 'Workflow',
+    profile: 'Perfil',
     namePlaceholder: 'Nombre del workflow',
     workspace: {
       title: 'Seleccionar workspace',
@@ -2073,6 +2074,7 @@ jobTriggered: 'Job ejecutado',
     },
     runs: {
       title: 'Run Records',
+      refresh: 'Refresh',
       empty: 'No run records',
       startNodes: '{count} start nodes',
       show: 'Show run records',
