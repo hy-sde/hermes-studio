@@ -107,6 +107,7 @@ export interface BridgeContextState {
   profile?: string
   model?: string
   provider?: string
+  workspace?: string
 }
 
 export type ChatRunSource = 'api_server' | 'cli' | 'coding_agent' | 'global_agent' | 'workflow'

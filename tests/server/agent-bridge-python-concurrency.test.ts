@@ -46,7 +46,36 @@ def _get_approval_callback():
 
 terminal_tool.set_approval_callback = set_approval_callback
 terminal_tool._get_approval_callback = _get_approval_callback
+terminal_tool._task_env_overrides = {}
+
+def register_task_env_overrides(task_id, overrides):
+    terminal_tool._task_env_overrides[task_id] = dict(overrides or {})
+
+terminal_tool.register_task_env_overrides = register_task_env_overrides
 sys.modules["tools.terminal_tool"] = terminal_tool
+
+agent_pkg = types.ModuleType("agent")
+agent_pkg.__path__ = []
+sys.modules["agent"] = agent_pkg
+
+runtime_cwd = types.ModuleType("agent.runtime_cwd")
+runtime_cwd._cwd = contextvars.ContextVar("runtime_cwd", default="")
+runtime_cwd._cleared = []
+
+def set_session_cwd(cwd):
+    runtime_cwd._cwd.set(cwd or "")
+
+def clear_session_cwd():
+    runtime_cwd._cleared.append(runtime_cwd._cwd.get())
+    runtime_cwd._cwd.set("")
+
+def resolve_agent_cwd():
+    return runtime_cwd._cwd.get()
+
+runtime_cwd.set_session_cwd = set_session_cwd
+runtime_cwd.clear_session_cwd = clear_session_cwd
+runtime_cwd.resolve_agent_cwd = resolve_agent_cwd
+sys.modules["agent.runtime_cwd"] = runtime_cwd
 
 approval = types.ModuleType("tools.approval")
 approval._session_key = contextvars.ContextVar("approval_session_key", default="")
@@ -156,7 +185,7 @@ def make_pool():
     pool._db = FakeDbHolder(fake_db)
     return pool, fake_db
 
-def start_manual_run(pool, session_id, agent, message=None):
+def start_manual_run(pool, session_id, agent, message=None, workspace=None):
     session = bridge.AgentSession(session_id=session_id, agent=agent)
     run_id = f"run-{session_id}"
     record = bridge.RunRecord(run_id=run_id, session_id=session_id)
@@ -167,7 +196,7 @@ def start_manual_run(pool, session_id, agent, message=None):
         pool._runs[run_id] = record
     thread = threading.Thread(
         target=pool._run_chat,
-        args=(session, record, message or f"message:{session_id}", None, None, [], "default", False, "api_server"),
+        args=(session, record, message or f"message:{session_id}", None, None, [], "default", False, workspace, "api_server"),
         daemon=True,
     )
     thread.start()
@@ -1202,6 +1231,44 @@ assert events == [
     ("lock-free-during-shutdown", True),
     "shutdown-finished",
 ], events
+`)
+  })
+
+  it('binds workspace cwd per running session without process-wide cwd state', () => {
+    runPython(String.raw`
+${harness}
+
+class WorkspaceAgent:
+    def __init__(self):
+        self.seen = []
+
+    def run_conversation(self, message, session_id=None, stream_callback=None, **kwargs):
+        from agent.runtime_cwd import resolve_agent_cwd
+
+        cwd = resolve_agent_cwd()
+        self.seen.append((session_id, cwd))
+        if stream_callback:
+            stream_callback(cwd)
+        time.sleep(0.05)
+        return {"output": cwd}
+
+pool, _fake_db = make_pool()
+agent_a = WorkspaceAgent()
+agent_b = WorkspaceAgent()
+
+session_a, record_a, thread_a = start_manual_run(pool, "session-a", agent_a, "a", "/repo/a")
+session_b, record_b, thread_b = start_manual_run(pool, "session-b", agent_b, "b", "/repo/b")
+
+thread_a.join(timeout=2)
+thread_b.join(timeout=2)
+assert not thread_a.is_alive(), record_a.result
+assert not thread_b.is_alive(), record_b.result
+
+assert [cwd for _session_id, cwd in agent_a.seen] == ["/repo/a"], agent_a.seen
+assert [cwd for _session_id, cwd in agent_b.seen] == ["/repo/b"], agent_b.seen
+assert terminal_tool._task_env_overrides["session-a"] == {"cwd": "/repo/a"}, terminal_tool._task_env_overrides
+assert terminal_tool._task_env_overrides["session-b"] == {"cwd": "/repo/b"}, terminal_tool._task_env_overrides
+assert runtime_cwd.resolve_agent_cwd() == "", runtime_cwd.resolve_agent_cwd()
 `)
   })
 })

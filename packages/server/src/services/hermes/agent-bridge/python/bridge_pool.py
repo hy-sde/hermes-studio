@@ -42,6 +42,37 @@ from bridge_runtime import (
     _tool_names_from_definitions,
 )
 
+
+def _bind_session_workspace_cwd(session_id: str, workspace: str | None) -> bool:
+    workspace_cwd = str(workspace or "").strip()
+    if not workspace_cwd:
+        return False
+    bound = False
+    try:
+        from agent.runtime_cwd import set_session_cwd
+
+        set_session_cwd(workspace_cwd)
+        bound = True
+        try:
+            from tools.terminal_tool import register_task_env_overrides
+
+            register_task_env_overrides(session_id, {"cwd": workspace_cwd})
+        except Exception:
+            pass
+    except Exception:
+        return bound
+    return bound
+
+
+def _clear_session_workspace_cwd() -> None:
+    try:
+        from agent.runtime_cwd import clear_session_cwd
+
+        clear_session_cwd()
+    except Exception:
+        pass
+
+
 class SessionDbHolder:
     def __init__(self) -> None:
         self._lock = threading.Lock()
@@ -556,9 +587,15 @@ class AgentPool:
         profile: str | None = None,
         model: str | None = None,
         provider: str | None = None,
+        workspace: str | None = None,
     ) -> dict[str, Any]:
         session = self.get_or_create(session_id, profile=profile, model=model, provider=provider)
-        context_info = self._estimate_context_info(session.agent, messages or [], instructions)
+        session_cwd_bound = _bind_session_workspace_cwd(session.session_id, workspace)
+        try:
+            context_info = self._estimate_context_info(session.agent, messages or [], instructions)
+        finally:
+            if session_cwd_bound:
+                _clear_session_workspace_cwd()
         print(
             "[hermes_bridge] context estimate "
             f"session={session_id} profile={profile or 'default'} "
@@ -1016,6 +1053,7 @@ class AgentPool:
         force_compress: bool = False,
         model: str | None = None,
         provider: str | None = None,
+        workspace: str | None = None,
         source: str | None = None,
         reasoning_effort: str | None = None,
     ) -> RunRecord:
@@ -1030,20 +1068,25 @@ class AgentPool:
             session.running = True
             session.current_run_id = run_id
             session.last_used_at = time.time()
-            context_event = self._bridge_context_ready_event(session, instructions, profile)
-            if context_event:
-                record.events.append(_jsonable(context_event))
+            session_cwd_bound = _bind_session_workspace_cwd(session.session_id, workspace)
+            try:
+                context_event = self._bridge_context_ready_event(session, instructions, profile)
+                if context_event:
+                    record.events.append(_jsonable(context_event))
+            finally:
+                if session_cwd_bound:
+                    _clear_session_workspace_cwd()
 
         thread = threading.Thread(
             target=self._run_chat,
-            args=(session, record, message, storage_message, instructions, conversation_history, profile, force_compress, source, reasoning_effort),
+            args=(session, record, message, storage_message, instructions, conversation_history, profile, force_compress, workspace, source, reasoning_effort),
             daemon=True,
             name=f"hermes-bridge-run-{run_id[:8]}",
         )
         thread.start()
         return record
 
-    def _run_chat(self, session: AgentSession, record: RunRecord, message: Any, storage_message: Any | None = None, instructions: str | None = None, conversation_history: list[dict[str, Any]] | None = None, profile: str | None = None, force_compress: bool = False, source: str | None = None, reasoning_effort: str | None = None) -> None:
+    def _run_chat(self, session: AgentSession, record: RunRecord, message: Any, storage_message: Any | None = None, instructions: str | None = None, conversation_history: list[dict[str, Any]] | None = None, profile: str | None = None, force_compress: bool = False, workspace: str | None = None, source: str | None = None, reasoning_effort: str | None = None) -> None:
         with _profile_env(profile):
             _refresh_approval_allowlist()
             _install_execute_code_approval_memory_patch()
@@ -1067,10 +1110,12 @@ class AgentPool:
             approval_session_token = None
             registered_gateway_approval_session = None
             exec_ask_scope_entered = False
+            session_cwd_bound = False
             db_count_after_prepersist: int | None = None
             result_for_tail_sync: dict[str, Any] | None = None
             tail_synced = False
             try:
+                session_cwd_bound = _bind_session_workspace_cwd(session.session_id, workspace)
                 try:
                     self._enter_exec_ask_scope()
                     exec_ask_scope_entered = True
@@ -1239,6 +1284,8 @@ class AgentPool:
                         pass
                 if exec_ask_scope_entered:
                     self._exit_exec_ask_scope()
+                if session_cwd_bound:
+                    _clear_session_workspace_cwd()
 
     def interrupt(self, session_id: str, message: str | None = None) -> dict[str, Any]:
         with self._lock:

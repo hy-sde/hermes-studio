@@ -65,6 +65,7 @@ class BridgeServer:
             profile = req.get("profile")
             model = req.get("model")
             provider = req.get("provider")
+            workspace = req.get("workspace")
             source = req.get("source")
             # Local patch (reasoning-effort): per-session reasoning effort override (Web UI brain button).
             reasoning_effort = req.get("reasoning_effort")
@@ -78,6 +79,7 @@ class BridgeServer:
                 bool(req.get("force_compress")),
                 model,
                 provider,
+                workspace,
                 source,
                 reasoning_effort,
             )
@@ -103,6 +105,7 @@ class BridgeServer:
                 profile=req.get("profile"),
                 model=req.get("model"),
                 provider=req.get("provider"),
+                workspace=req.get("workspace"),
             )
 
         if action == "get_result":

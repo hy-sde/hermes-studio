@@ -202,10 +202,15 @@ describe('bridge run final context usage', () => {
       [],
       expect.not.stringContaining('[Current Hermes profile:'),
       'default',
-      { model: 'gpt-test', provider: 'openai' },
+      {
+        model: 'gpt-test',
+        provider: 'openai',
+        workspace: '/tmp/hermes-bridge-final-context/default/workspace',
+      },
     )
     expect(bridge.contextEstimate.mock.calls[0][2]).toContain('system prompt')
     expect(bridge.contextEstimate.mock.calls[0][2]).toContain('X-Hermes-Profile')
+    expect(bridge.contextEstimate.mock.calls[0][2]).not.toContain('Current working directory')
     expect(state.contextTokens).toBe(12345)
     expect(emit).toHaveBeenCalledWith('usage.updated', expect.objectContaining({
       inputTokens: 11,
@@ -315,6 +320,7 @@ describe('bridge run final context usage', () => {
     expect(issueModelRunJwtMock).toHaveBeenCalledWith({ id: 1, username: 'admin', role: 'super_admin' })
     expect(readFileSync(join(process.env.HERMES_WEB_UI_HOME || '', 'profiles', 'default', '.model-run-token'), 'utf-8').trim()).toBe('model-run-token')
     expect(instructions).not.toContain('[Current Hermes profile:')
+    expect(instructions).not.toContain('Current working directory')
     expect(instructions).not.toContain('pass the current Hermes profile as the profile argument')
     expect(instructions).not.toContain('model-run-token')
     expect(instructions).not.toContain('Current Hermes Web UI model run token')
@@ -363,6 +369,61 @@ describe('bridge run final context usage', () => {
       workspace: '/tmp/hermes-bridge-final-context/default/workspace',
     }))
     expect(state.source).toBe('global_agent')
+  })
+
+  it('passes the workflow workspace through to bridge runs', async () => {
+    const emit = vi.fn()
+    const nsp = makeNamespace(emit)
+    const socket = makeSocket()
+    const state = makeState()
+    const sessionMap = new Map([['workflow-session', state]])
+    const bridge = {
+      chat: vi.fn().mockResolvedValue({ run_id: 'run-workflow', status: 'started' }),
+      contextEstimate: vi.fn().mockResolvedValue({
+        token_count: 42,
+        message_count: 1,
+        tool_count: 0,
+        system_prompt_chars: 13,
+      }),
+      streamOutput: vi.fn(async function* () {
+        yield { run_id: 'run-workflow', done: true, status: 'completed', output: 'done' }
+      }),
+    } as any
+
+    getSessionMock.mockReturnValue(undefined)
+
+    const { handleBridgeRun } = await import('../../packages/server/src/services/hermes/run-chat/handle-bridge-run')
+    await handleBridgeRun(
+      nsp,
+      socket,
+      {
+        input: 'run workflow node',
+        session_id: 'workflow-session',
+        source: 'workflow',
+        workspace: '/tmp/hermes-workflow-workspace',
+      },
+      'default',
+      sessionMap,
+      bridge,
+      false,
+      vi.fn(),
+      vi.fn(),
+    )
+
+    expect(createSessionMock).toHaveBeenCalledWith(expect.objectContaining({
+      id: 'workflow-session',
+      source: 'workflow',
+      workspace: '/tmp/hermes-workflow-workspace',
+    }))
+    expect(bridge.chat).toHaveBeenCalledWith(
+      'workflow-session',
+      'run workflow node',
+      expect.any(Array),
+      expect.any(String),
+      'default',
+      expect.objectContaining({ workspace: '/tmp/hermes-workflow-workspace' }),
+    )
+    expect(state.source).toBe('workflow')
   })
 
   it('evaluates active goals after a successful bridge run and queues continuation prompts', async () => {
@@ -747,7 +808,10 @@ describe('bridge run final context usage', () => {
       expect.any(Array),
       expect.any(String),
       'default',
-      expect.objectContaining({ storage_message: '/plan build the feature' }),
+      expect.objectContaining({
+        storage_message: '/plan build the feature',
+        workspace: '/tmp/hermes-bridge-final-context/default/workspace',
+      }),
     )
   })
 
@@ -806,7 +870,10 @@ describe('bridge run final context usage', () => {
       expect.any(Array),
       expect.any(String),
       'default',
-      expect.objectContaining({ storage_message: '[IMPORTANT: expanded skill prompt]' }),
+      expect.objectContaining({
+        storage_message: '[IMPORTANT: expanded skill prompt]',
+        workspace: '/tmp/hermes-bridge-final-context/default/workspace',
+      }),
     )
   })
 

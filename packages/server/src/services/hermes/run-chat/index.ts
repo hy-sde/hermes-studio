@@ -25,7 +25,6 @@ import { contentBlocksToString } from './content-blocks'
 import type { ContentBlock, QueuedRun, SessionState } from './types'
 import { authenticateUserToken, isAuthEnabled, type AuthenticatedUser } from '../../../middleware/user-auth'
 import { userCanAccessProfile } from '../../../db/hermes/users-store'
-import { ensureHermesRunWorkspace } from './workspace'
 
 export type { ContentBlock } from './types'
 
@@ -446,14 +445,6 @@ export class ChatRunSocket {
       let fullInstructions = data.instructions
         ? `${getSystemPrompt(undefined, { source })}\n${data.instructions}`
         : getSystemPrompt(undefined, { source })
-      if (data.session_id) {
-        const sessionRow = getSession(data.session_id)
-        const workspace = await ensureHermesRunWorkspace(profile, sessionRow?.workspace || data.workspace)
-        if (workspace) {
-          const workspaceCtx = `[Current working directory: ${workspace}]`
-          fullInstructions = `\n${workspaceCtx}\n${fullInstructions}`
-        }
-      }
 
       await handleBridgeRun(
         this.nsp, socket, { ...data, instructions: fullInstructions }, profile,
@@ -546,6 +537,7 @@ export class ChatRunSocket {
           instructions,
           model: session?.model,
           provider: session?.provider,
+          workspace: session?.workspace,
           source,
         },
         this.sessionMap,
@@ -583,11 +575,7 @@ export class ChatRunSocket {
 
   private resumeInstructionsForSession(sessionId: string): string {
     const sessionRow = getSession(sessionId)
-    let fullInstructions = getSystemPrompt(undefined, { source: sessionRow?.source })
-    if (sessionRow?.workspace) {
-      fullInstructions = `\n[Current working directory: ${sessionRow.workspace}]\n${fullInstructions}`
-    }
-    return fullInstructions
+    return getSystemPrompt(undefined, { source: sessionRow?.source })
   }
 
   // --- Queue ---
