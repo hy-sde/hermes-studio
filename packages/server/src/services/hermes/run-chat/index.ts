@@ -17,6 +17,7 @@ import { getAgentBridgeManager } from '../agent-bridge/manager'
 import { redactAgentBridgeError } from '../agent-bridge/redact'
 import { handleBridgeRun, resumeBridgeRun } from './handle-bridge-run'
 import { handleCodingAgentRun } from './handle-coding-agent-run'
+import { handleOmpRun } from './handle-omp-run'
 import { handleAbort } from './abort'
 import { getOrCreateSession } from './compression'
 import { loadSessionStateFromDb, resolveRunSource } from './load-state'
@@ -402,6 +403,17 @@ export class ChatRunSocket {
   ) {
     const source = resolveRunSource(data.source, data.session_id)
     if (data.session_id && isBridgeRunSource(source) && isSessionCommand(data.input)) return
+
+    if (source === 'omp') {
+      await handleOmpRun(
+        this.nsp, socket, data, profile,
+        this.sessionMap,
+        loadSessionStateFromDb,
+        this.dequeueNextQueuedRun.bind(this),
+        skipUserMessage,
+      )
+      return
+    }
 
     if (!isCodingAgentExecution(source, data)) {
       const bridgeReady = await ensureBridgeReadyForChatRun()

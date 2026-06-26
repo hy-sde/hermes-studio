@@ -318,7 +318,7 @@ const headerTitle = computed(() =>
 );
 
 const showNewChatModal = ref(false);
-const newChatAgent = ref<"hermes" | "claude-code" | "codex">("hermes");
+const newChatAgent = ref<"hermes" | "claude-code" | "codex" | "omp">("hermes");
 const newChatAgentMode = ref<"global" | "scoped">("scoped");
 const newChatProfile = ref<string>("default");
 const newChatProvider = ref<string>("");
@@ -334,6 +334,7 @@ const newChatAgentOptions = computed(() => [
   { label: "Hermes", value: "hermes" },
   { label: "Claude Code", value: "claude-code" },
   { label: "Codex", value: "codex" },
+  { label: "omp", value: "omp" },
 ]);
 
 const newChatApiModeOptions = computed(() => [
@@ -433,7 +434,7 @@ const selectedNewChatProviderGroup = computed(() =>
   newChatModelGroups.value.find((item) => item.provider === newChatProvider.value),
 );
 
-const isNewChatCodingAgent = computed(() => newChatAgent.value !== "hermes");
+const isNewChatCodingAgent = computed(() => newChatAgent.value !== "hermes" && newChatAgent.value !== "omp");
 const isNewChatGlobalCodingAgent = computed(() =>
   isNewChatCodingAgent.value && newChatAgentMode.value === "global",
 );
@@ -529,7 +530,7 @@ function handleNewChatProviderChange(value: string) {
 }
 
 async function confirmNewChat() {
-  if (newChatAgent.value !== "hermes") {
+  if (newChatAgent.value !== "hermes" && newChatAgent.value !== "omp") {
     newChatLoading.value = true;
     try {
       const agentId = newChatAgent.value as CodingAgentId;
@@ -551,20 +552,22 @@ async function confirmNewChat() {
   }
 
   const group = selectedNewChatProviderGroup.value;
-  const source = newChatAgent.value === "hermes" ? "cli" : "coding_agent";
+  const source = newChatAgent.value === "hermes" ? "cli" : newChatAgent.value === "omp" ? "omp" : "coding_agent";
   const isGlobalCodingAgent = source === "coding_agent" && newChatAgentMode.value === "global";
   const agent = newChatAgent.value === "codex"
     ? "codex"
     : newChatAgent.value === "claude-code"
       ? "claude"
-      : "hermes";
+      : newChatAgent.value === "omp"
+        ? "omp"
+        : "hermes";
   const session = chatStore.newChat({
     profile: newChatProfile.value,
     provider: isGlobalCodingAgent ? undefined : newChatProvider.value,
     model: isGlobalCodingAgent ? undefined : newChatModel.value,
     source,
     agent,
-    codingAgentId: newChatAgent.value === "hermes" ? undefined : newChatAgent.value,
+    codingAgentId: newChatAgent.value === "hermes" || newChatAgent.value === "omp" ? undefined : newChatAgent.value,
     codingAgentMode: source === "coding_agent" ? newChatAgentMode.value : undefined,
     workspace: newChatWorkspace.value || null,
     baseUrl: source === "coding_agent" && !isGlobalCodingAgent ? group?.base_url || newChatBaseUrl.value.trim() || undefined : undefined,

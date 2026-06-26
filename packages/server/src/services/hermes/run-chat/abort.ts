@@ -68,7 +68,7 @@ export async function handleAbort(
   logger.info({ sessionId, runId }, '[chat-run-socket][abort] started')
 
   // Flush in-memory assistant text to DB before aborting the stream.
-  if (isBridgeRunSource(activeState.source)) {
+  if (isBridgeRunSource(activeState.source) || activeState.source === 'omp') {
     flushBridgePendingToDb(activeState, sessionId)
   } else {
     flushResponseRunToDb(activeState, sessionId)

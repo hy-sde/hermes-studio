@@ -2,6 +2,7 @@ import { logger } from './logger'
 import { closeDb } from '../db'
 import { stopPreviewRuntime } from '../controllers/update'
 import { codingAgentRunManager } from './agent-runner/coding-agent-run-manager'
+import { ompSessionManager } from './hermes/run-chat/omp-session-manager'
 import { shutdownManagedGateways } from './hermes/gateway-runner'
 import { stopOutboundRelayClient } from './global-agent/outbound-relay-client'
 
@@ -96,6 +97,9 @@ export function createShutdownHandler(server: any, groupChatServer?: any, chatRu
 
       codingAgentRunManager.shutdown()
       logger.info('Coding agent hidden sessions closed')
+
+      ompSessionManager.stopAll()
+      logger.info('omp sessions closed')
 
       // Disconnect Socket.IO before HTTP server to prevent hanging
       if (groupChatServer) {
