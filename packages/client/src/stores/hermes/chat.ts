@@ -953,8 +953,8 @@ export const useChatStore = defineStore('chat', () => {
     profile?: string
     model?: string
     provider?: string
-    source?: 'api_server' | 'cli' | 'coding_agent' | 'global_agent' | 'workflow'
-    agent?: 'hermes' | 'claude' | 'codex'
+    source?: 'api_server' | 'cli' | 'coding_agent' | 'global_agent' | 'workflow' | 'omp'
+    agent?: 'hermes' | 'claude' | 'codex' | 'omp'
     codingAgentId?: 'claude-code' | 'codex'
     codingAgentMode?: 'global' | 'scoped'
     workspace?: string | null
@@ -962,15 +962,16 @@ export const useChatStore = defineStore('chat', () => {
     apiKey?: string
     apiMode?: ProviderApiMode
   } = {}): Session {
-    const source = runtimeMode.value === 'global_agent' ? 'global_agent' : options.source || 'cli'
-    const codingAgentId = options.codingAgentId || (options.agent === 'codex' ? 'codex' : options.agent === 'claude' ? 'claude-code' : undefined)
+    const isOmp = options.agent === 'omp' || options.source === 'omp'
+    const source = isOmp ? 'omp' : runtimeMode.value === 'global_agent' ? 'global_agent' : options.source || 'cli'
+    const codingAgentId = isOmp ? undefined : options.codingAgentId || (options.agent === 'codex' ? 'codex' : options.agent === 'claude' ? 'claude-code' : undefined)
     const codingAgentMode = codingAgentId ? (options.codingAgentMode || 'scoped') : undefined
     const session: Session = {
       id: uid(),
       profile: options.profile || useProfilesStore().activeProfileName || 'default',
       title: '',
       source,
-      agent: options.agent || (codingAgentId ? (codingAgentId === 'codex' ? 'codex' : 'claude') : 'hermes'),
+      agent: isOmp ? 'omp' : options.agent || (codingAgentId ? (codingAgentId === 'codex' ? 'codex' : 'claude') : 'hermes'),
       codingAgentId,
       codingAgentMode,
       messages: [],
@@ -1223,8 +1224,8 @@ export const useChatStore = defineStore('chat', () => {
     profile?: string
     model?: string
     provider?: string
-    source?: 'api_server' | 'cli' | 'coding_agent' | 'global_agent' | 'workflow'
-    agent?: 'hermes' | 'claude' | 'codex'
+    source?: 'api_server' | 'cli' | 'coding_agent' | 'global_agent' | 'workflow' | 'omp'
+    agent?: 'hermes' | 'claude' | 'codex' | 'omp'
     codingAgentId?: 'claude-code' | 'codex'
     codingAgentMode?: 'global' | 'scoped'
     workspace?: string | null
@@ -1233,8 +1234,9 @@ export const useChatStore = defineStore('chat', () => {
     apiMode?: ProviderApiMode
   } = {}): Session {
     const appStore = useAppStore()
-    const storageSource = runtimeMode.value === 'global_agent' ? 'global_agent' : options.source || 'cli'
-    const codingAgentId = options.codingAgentId || (options.agent === 'codex' ? 'codex' : options.agent === 'claude' ? 'claude-code' : undefined)
+    const isOmp = options.agent === 'omp' || options.source === 'omp'
+    const storageSource = isOmp ? 'omp' : runtimeMode.value === 'global_agent' ? 'global_agent' : options.source || 'cli'
+    const codingAgentId = isOmp ? undefined : options.codingAgentId || (options.agent === 'codex' ? 'codex' : options.agent === 'claude' ? 'claude-code' : undefined)
     const isGlobalCodingAgent = Boolean(codingAgentId) && options.codingAgentMode === 'global'
     const session = createSession({
       profile: options.profile,
@@ -2032,6 +2034,8 @@ export const useChatStore = defineStore('chat', () => {
         ? 'global_agent'
         : storedSource === 'workflow'
           ? 'workflow'
+        : storedSource === 'omp'
+          ? 'omp'
         : isCodingAgentSession
           ? 'coding_agent'
           : storedSource === 'api_server'
